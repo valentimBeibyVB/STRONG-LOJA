@@ -49,8 +49,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onUpdateConfig,
   onImportProducts,
 }) => {
-  if (!isOpen) return null;
-
   // Authentication State (Isolated from customer view)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
@@ -66,11 +64,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'products' | 'new' | 'settings' | 'github'>('products');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-
-  // Sync settings form when config changes
-  useEffect(() => {
-    setSettingsForm({ ...config });
-  }, [config]);
 
   // Form State for creating / editing product
   const [formName, setFormName] = useState('');
@@ -101,6 +94,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync settings form when config changes
+  useEffect(() => {
+    setSettingsForm({ ...config });
+  }, [config]);
+
+  if (!isOpen) return null;
 
   // Load product data into edit form
   const handleStartEdit = (product: Product) => {
@@ -254,7 +254,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(products, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `strong-catalogo-${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute('download', 'catalog.json');
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -1067,6 +1067,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   Como você mencionou que vai utilizar o seu repositório no GitHub para armazenar e aceder a esta página web, 
                   você pode exportar o arquivo do catálogo aqui com 1 clique para manter os produtos atualizados.
                 </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-400/10 border border-amber-400/30 space-y-2">
+                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <KeyRound className="w-4 h-4" />
+                  Como sincronizar alterações entre computadores e telemóveis (GitHub):
+                </h4>
+                <ol className="text-xs text-neutral-300 list-decimal list-inside space-y-1.5 leading-relaxed">
+                  <li>Faça as alterações ou adicione fotos e produtos aqui no ADM.</li>
+                  <li>Clique em <strong className="text-amber-400">"Baixar Catálogo (JSON)"</strong> abaixo.</li>
+                  <li>Atualize o ficheiro correspondente no seu repositório GitHub para que todos os clientes e outros dispositivos vejam as novidades online.</li>
+                  <li>Em qualquer outro aparelho onde aceder ao ADM, você também pode usar <strong className="text-white">"Importar Catálogo (JSON)"</strong> para carregar imediatamente.</li>
+                </ol>
               </div>
 
               <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">

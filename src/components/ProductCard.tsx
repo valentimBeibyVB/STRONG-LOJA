@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Check, Eye, MessageCircle, Sparkles } from 'lucide-react';
 import { Product, ProductColor, StoreConfig } from '../types';
 import { formatPrice, generateDirectProductWhatsAppUrl } from '../utils/whatsapp';
@@ -20,6 +20,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [selectedColor, setSelectedColor] = useState<ProductColor>(product.colors[0] || { name: 'Padrão', hex: '#000000' });
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || 'Tamanho Único');
   const [isAddedFeedback, setIsAddedFeedback] = useState(false);
+
+  // Sync selected color and size when product changes (e.g. from Admin updates)
+  useEffect(() => {
+    if (product.colors && product.colors.length > 0) {
+      // Keep color if still available in updated product, otherwise fallback to first
+      setSelectedColor((prev) => {
+        const found = product.colors.find((c) => c.name === prev.name);
+        return found || product.colors[0];
+      });
+    }
+    if (product.sizes && product.sizes.length > 0) {
+      setSelectedSize((prev) => {
+        return product.sizes.includes(prev) ? prev : product.sizes[0];
+      });
+    }
+  }, [product]);
 
   // Active display image (switches if color has specific image)
   const activeImage = selectedColor.image || product.image;

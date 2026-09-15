@@ -22,8 +22,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onClearCart,
   config,
 }) => {
-  if (!isOpen) return null;
-
   const [customerInfo, setCustomerInfo] = useState<CheckoutCustomerInfo>({
     name: '',
     phone: '',
@@ -34,6 +32,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const [showCustomerForm, setShowCustomerForm] = useState(true);
   const [copiedNotification, setCopiedNotification] = useState(false);
+
+  if (!isOpen) return null;
 
   const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);

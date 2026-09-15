@@ -50,6 +50,30 @@ export default function App() {
     return [];
   });
 
+  // Automatically fetch public/catalog.json if deployed on GitHub or server
+  useEffect(() => {
+    fetch('./catalog.json', { cache: 'no-store' })
+      .then((res) => {
+        if (res.ok) return res.json();
+        return null;
+      })
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          // If local storage is not modified or if user hasn't explicitly customized, or if catalog has newer/more items
+          setProducts((current) => {
+            const hasSaved = localStorage.getItem('strong_products');
+            if (!hasSaved) {
+              return data;
+            }
+            return current;
+          });
+        }
+      })
+      .catch(() => {
+        // file might not be present or fetched in offline mode, silently fallback to current state
+      });
+  }, []);
+
   // 2. Navigation & UI state
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');

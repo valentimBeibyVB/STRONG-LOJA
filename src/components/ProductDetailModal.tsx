@@ -18,10 +18,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onAddToCart,
 }) => {
-  if (!isOpen || !product) return null;
-
-  const [selectedColor, setSelectedColor] = useState<ProductColor>(product.colors[0] || { name: 'Padrão', hex: '#000000' });
-  const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || 'Tamanho Único');
+  const [selectedColor, setSelectedColor] = useState<ProductColor>(() => product?.colors[0] || { name: 'Padrão', hex: '#000000' });
+  const [selectedSize, setSelectedSize] = useState<string>(() => product?.sizes[0] || 'Tamanho Único');
   const [quantity, setQuantity] = useState(1);
   const [isAddedFeedback, setIsAddedFeedback] = useState(false);
 
@@ -37,12 +35,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Handle escape key
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !product) return null;
 
   const activeImage = selectedColor.image || product.image;
 
