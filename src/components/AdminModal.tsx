@@ -172,6 +172,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         // Convert to webp/jpeg data url
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setFormImage(dataUrl);
+        // Also update the colors without specific images or update the first color's image
+        setFormColors((prevColors) =>
+          prevColors.map((c, idx) => (idx === 0 || !c.image ? { ...c, image: dataUrl } : c))
+        );
       };
       img.src = event.target?.result as string;
     };
@@ -760,7 +764,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                             type="url"
                             placeholder="https://exemplo.com/foto.jpg"
                             value={formImage}
-                            onChange={(e) => setFormImage(e.target.value)}
+                            onChange={(e) => {
+                              const newUrl = e.target.value;
+                              setFormImage(newUrl);
+                              if (newUrl.trim()) {
+                                setFormColors((prevColors) =>
+                                  prevColors.map((c, idx) => (idx === 0 || !c.image ? { ...c, image: newUrl.trim() } : c))
+                                );
+                              }
+                            }}
                             className="w-full px-2.5 py-1.5 bg-neutral-900 border border-neutral-800 rounded text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
                           />
                         </div>
