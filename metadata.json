@@ -2,5 +2,7 @@
   "name": "Strong — Marca de Roupa",
   "description": "Loja dinâmica da marca de roupa Strong com seleção de cores, carrinho de compras interativo, checkout via WhatsApp e painel administrativo para gestão de produtos e imagens.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
