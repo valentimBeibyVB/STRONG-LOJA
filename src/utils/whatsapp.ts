@@ -1,0 +1,81 @@
+import { CartItem, CheckoutCustomerInfo, StoreConfig } from '../types';
+
+export function formatPrice(amount: number, config: StoreConfig): string {
+  const formatted = amount.toLocaleString('pt-PT', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
+  if (config.currencyPosition === 'prefix') {
+    return `${config.currencySymbol} ${formatted}`;
+  }
+  return `${formatted} ${config.currencySymbol}`;
+}
+
+export function generateWhatsAppOrderUrl(
+  items: CartItem[],
+  totalAmount: number,
+  config: StoreConfig,
+  customer?: CheckoutCustomerInfo
+): string {
+  const cleanedPhone = config.whatsappNumber.replace(/\D/g, '');
+  const orderId = `STR-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  let text = `🔥 *NOVA ENCOMENDA STRONG — #${orderId}*\n\n`;
+  text += `${config.welcomeMessage}\n\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `🛒 *PRODUTOS ESCOLHIDOS:*\n\n`;
+
+  items.forEach((item, index) => {
+    const itemTotal = item.price * item.quantity;
+    text += `*${index + 1}. ${item.name}*\n`;
+    text += `   • *Cor:* ${item.selectedColor.name}\n`;
+    text += `   • *Tamanho:* ${item.selectedSize}\n`;
+    text += `   • *Qtd:* ${item.quantity}x (${formatPrice(item.price, config)} cada)\n`;
+    text += `   • *Subtotal:* ${formatPrice(itemTotal, config)}\n\n`;
+  });
+
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `💰 *TOTAL A PAGAR:* *${formatPrice(totalAmount, config)}*\n\n`;
+
+  if (customer && customer.name.trim()) {
+    text += `👤 *DADOS DO CLIENTE:*\n`;
+    text += `• *Nome:* ${customer.name.trim()}\n`;
+    if (customer.phone.trim()) {
+      text += `• *Contacto:* ${customer.phone.trim()}\n`;
+    }
+    if (customer.city.trim()) {
+      text += `• *Localidade / Entrega:* ${customer.city.trim()}\n`;
+    }
+    if (customer.paymentMethod) {
+      text += `• *Forma de Pagamento:* ${customer.paymentMethod}\n`;
+    }
+    if (customer.notes.trim()) {
+      text += `• *Observações:* ${customer.notes.trim()}\n`;
+    }
+    text += `\n`;
+  }
+
+  text += `📍 *Aguardo confirmação de disponibilidade e dados para pagamento.*`;
+
+  const encodedMessage = encodeURIComponent(text);
+  return `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`;
+}
+
+export function generateDirectProductWhatsAppUrl(
+  productName: string,
+  colorName: string,
+  size: string,
+  price: number,
+  config: StoreConfig
+): string {
+  const cleanedPhone = config.whatsappNumber.replace(/\D/g, '');
+  let text = `Olá Strong! Tenho interesse imediato no seguinte produto:\n\n`;
+  text += `👕 *${productName}*\n`;
+  text += `• *Cor:* ${colorName}\n`;
+  text += `• *Tamanho:* ${size}\n`;
+  text += `• *Preço:* ${formatPrice(price, config)}\n\n`;
+  text += `Ainda têm este item disponível para envio?`;
+
+  return `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodeURIComponent(text)}`;
+}
