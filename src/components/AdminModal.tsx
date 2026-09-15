@@ -9,6 +9,7 @@ import {
   Save,
   RotateCcw,
   Download,
+  Copy,
   Settings,
   Package,
   Check,
@@ -22,6 +23,9 @@ import {
   LogOut,
   ArrowLeft,
   ShieldCheck,
+  Cloud,
+  RefreshCw,
+  Wifi,
 } from 'lucide-react';
 import { Product, ProductColor, StoreConfig } from '../types';
 import { formatPrice } from '../utils/whatsapp';
@@ -36,6 +40,8 @@ interface AdminModalProps {
   config: StoreConfig;
   onUpdateConfig: (newConfig: StoreConfig) => void;
   onImportProducts: (products: Product[]) => void;
+  isServerSyncActive?: boolean;
+  onForceSync?: () => Promise<void>;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -48,6 +54,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   config,
   onUpdateConfig,
   onImportProducts,
+  isServerSyncActive = false,
+  onForceSync,
 }) => {
   // Authentication State (Isolated from customer view)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -91,6 +99,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [settingsForm, setSettingsForm] = useState<StoreConfig>({ ...config });
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
   const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +109,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   useEffect(() => {
     setSettingsForm({ ...config });
   }, [config]);
+
+  const handleManualSync = async () => {
+    if (!onForceSync) return;
+    setIsSyncing(true);
+    setSyncFeedback(null);
+    try {
+      await onForceSync();
+      setSyncFeedback('Sincronização concluída! Todos os dispositivos estão atualizados.');
+    } catch {
+      setSyncFeedback('Erro ao sincronizar com o servidor.');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncFeedback(null), 4000);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -262,6 +287,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     navigator.clipboard.writeText(JSON.stringify(products, null, 2));
     setJsonExportSuccess(true);
     setTimeout(() => setJsonExportSuccess(false), 3000);
+  };
+
+  const handleCopyJSONOnly = () => {
+    navigator.clipboard.writeText(JSON.stringify(products, null, 2));
+    setJsonExportSuccess(true);
+    setTimeout(() => setJsonExportSuccess(false), 3000);
+  };
+
+  const handlePurgeAndReload = async () => {
+    if (confirm('Deseja limpar o cache guardado neste navegador e recarregar os dados do arquivo catalog.json publicado no site?')) {
+      localStorage.removeItem('strong_products');
+      localStorage.removeItem('strong_config');
+      if (onForceSync) {
+        await onForceSync();
+      } else {
+        window.location.reload();
+      }
+      setSyncFeedback('Cache limpo e dados recarregados!');
+      setTimeout(() => setSyncFeedback(null), 3000);
+    }
   };
 
   // Import JSON Catalog
@@ -1062,42 +1107,115 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           {activeTab === 'github' && (
             <div className="space-y-6 max-w-2xl mx-auto">
               <div className="pb-3 border-b border-neutral-800">
-                <h3 className="text-sm font-black text-white">Exportação e Sincronização com GitHub</h3>
+                <h3 className="text-sm font-black text-white">Sincronização em Nuvem & Backup GitHub</h3>
                 <p className="text-xs text-neutral-400">
-                  Como você mencionou que vai utilizar o seu repositório no GitHub para armazenar e aceder a esta página web, 
-                  você pode exportar o arquivo do catálogo aqui com 1 clique para manter os produtos atualizados.
+                  Gerencie a sincronização de produtos e fotos entre todos os dispositivos (computador, telemóvel e clientes).
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-amber-400/10 border border-amber-400/30 space-y-2">
+              {/* Multi-Device Live Sync Status Card */}
+              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-700 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-5 h-5 text-amber-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Sincronização entre Dispositivos
+                    </h4>
+                  </div>
+                  {isServerSyncActive ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Servidor Conectado (Tempo Real)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      <Wifi className="w-3 h-3" />
+                      Modo Estático / GitHub
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  {isServerSyncActive
+                    ? 'Qualquer alteração, foto nova ou catálogo importado aqui é gravado no servidor. Todos os telemóveis e computadores que abrirem o site receberão a versão atualizada automaticamente!'
+                    : 'Para que outros dispositivos (como o seu telemóvel) vejam os novos produtos, você pode clicar em "Baixar Catálogo (JSON)" abaixo e atualizar o arquivo public/catalog.json no seu repositório GitHub.'}
+                </p>
+
+                {onForceSync && (
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleManualSync}
+                      disabled={isSyncing}
+                      className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 disabled:bg-neutral-700 text-neutral-950 font-bold text-xs flex items-center gap-2 transition shadow-md shadow-amber-400/20"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                      {isSyncing ? 'Sincronizando...' : 'Verificar Atualizações no Servidor'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handlePurgeAndReload}
+                      className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs flex items-center gap-2 border border-neutral-700 transition"
+                      title="Força este aparelho a descartar o cache local e baixar o catálogo mais recente do site"
+                    >
+                      <RotateCcw className="w-4 h-4 text-amber-400" />
+                      Recarregar Dados do Site (Limpar Cache)
+                    </button>
+
+                    {syncFeedback && (
+                      <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> {syncFeedback}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Explicação Clara: Por que só alterava no mesmo dispositivo? */}
+              <div className="p-4 rounded-xl bg-amber-400/10 border border-amber-400/30 space-y-2.5">
                 <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                   <KeyRound className="w-4 h-4" />
-                  Como sincronizar alterações entre computadores e telemóveis (GitHub):
+                  Como fazer as alterações aparecerem em TODOS os telemóveis e computadores:
                 </h4>
-                <ol className="text-xs text-neutral-300 list-decimal list-inside space-y-1.5 leading-relaxed">
-                  <li>Faça as alterações ou adicione fotos e produtos aqui no ADM.</li>
-                  <li>Clique em <strong className="text-amber-400">"Baixar Catálogo (JSON)"</strong> abaixo.</li>
-                  <li>Atualize o ficheiro correspondente no seu repositório GitHub para que todos os clientes e outros dispositivos vejam as novidades online.</li>
-                  <li>Em qualquer outro aparelho onde aceder ao ADM, você também pode usar <strong className="text-white">"Importar Catálogo (JSON)"</strong> para carregar imediatamente.</li>
-                </ol>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  O <strong>GitHub Pages</strong> é uma hospedagem estática. Por segurança, os navegadores não conseguem gravar diretamente nos servidores do GitHub sem você enviar o arquivo. Por isso, quando você salva no computador, as alterações ficam salvas apenas na memória deste computador.
+                </p>
+                <div className="p-3 rounded-lg bg-neutral-950/80 border border-neutral-800 space-y-2">
+                  <span className="text-xs font-bold text-white block">Siga estes 3 passos simples:</span>
+                  <ol className="text-xs text-neutral-300 list-decimal list-inside space-y-1.5 leading-relaxed">
+                    <li>No computador onde editou os produtos, clique em <strong className="text-amber-400">"Baixar Catálogo (JSON)"</strong> abaixo.</li>
+                    <li>Vá ao seu repositório no GitHub, abra a pasta <code className="text-amber-300">public/</code> e substitua o arquivo <code className="text-amber-300">catalog.json</code> pelo novo.</li>
+                    <li>Pronto! Em 1 a 2 minutos, <strong>qualquer telemóvel ou cliente que entrar no site verá os novos produtos e preços</strong>.</li>
+                  </ol>
+                </div>
               </div>
 
               <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Download className="w-4 h-4 text-amber-400" />
-                  Exportar Catálogo em JSON
+                  Exportar Catálogo em JSON ({products.length} produtos carregados)
                 </h4>
                 <p className="text-xs text-neutral-400">
-                  Baixe todos os produtos e imagens atuais como um ficheiro JSON ou copie diretamente para a área de transferência.
+                  Baixe todos os produtos e imagens atuais como um ficheiro JSON ou copie diretamente para colar no GitHub.
                 </p>
-                <div className="flex items-center gap-3 pt-1">
+                <div className="flex flex-wrap items-center gap-3 pt-1">
                   <button
                     onClick={handleExportJSON}
                     className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-2 transition"
                   >
                     <Download className="w-4 h-4" />
-                    Baixar Catálogo (JSON)
+                    Baixar Catálogo (catalog.json)
                   </button>
+
+                  <button
+                    onClick={handleCopyJSONOnly}
+                    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-2 border border-neutral-700 transition"
+                  >
+                    <Copy className="w-4 h-4 text-amber-400" />
+                    Copiar Código JSON
+                  </button>
+
                   {jsonExportSuccess && (
                     <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" /> Baixado e copiado!

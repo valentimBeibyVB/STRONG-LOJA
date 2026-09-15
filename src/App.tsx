@@ -50,28 +50,174 @@ export default function App() {
     return [];
   });
 
-  // Automatically fetch public/catalog.json if deployed on GitHub or server
-  useEffect(() => {
-    fetch('./catalog.json', { cache: 'no-store' })
-      .then((res) => {
-        if (res.ok) return res.json();
-        return null;
-      })
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          // If local storage is not modified or if user hasn't explicitly customized, or if catalog has newer/more items
-          setProducts((current) => {
-            const hasSaved = localStorage.getItem('strong_products');
-            if (!hasSaved) {
-              return data;
-            }
-            return current;
-          });
-        }
-      })
-      .catch(() => {
-        // file might not be present or fetched in offline mode, silently fallback to current state
+  // Cloud Sync state
+  const [isServerSyncActive, setIsServerSyncActive] = useState<boolean>(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  // Synchronize products to server & local storage
+  const persistProducts = async (newProducts: Product[]) => {
+    try {
+      localStorage.setItem('strong_products', JSON.stringify(newProducts));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProducts),
       });
+      if (res.ok) {
+        setIsServerSyncActive(true);
+        setSyncToast('Alterações salvas e sincronizadas com todos os dispositivos!');
+        setTimeout(() => setSyncToast(null), 3500);
+        return true;
+      }
+    } catch (err) {
+      console.log('Server not reachable (running static or offline):', err);
+    }
+    return false;
+  };
+
+  // Synchronize store config to server & local storage
+  const persistConfig = async (newConfig: StoreConfig) => {
+    try {
+      localStorage.setItem('strong_config', JSON.stringify(newConfig));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig),
+      });
+      if (res.ok) {
+        setIsServerSyncActive(true);
+        return true;
+      }
+    } catch (err) {
+      console.log('Server not reachable for config sync');
+    }
+    return false;
+  };
+
+  // Helper to fetch JSON with multiple candidate paths (essential for GitHub Pages subpaths)
+  const fetchJsonWithFallback = async (filename: string) => {
+    const timestamp = Date.now();
+    const base = (import.meta as any).env?.BASE_URL || './';
+    const normalizedBase = base.endsWith('/') ? base : base + '/';
+
+    const candidateUrls = [
+      `${normalizedBase}${filename}?t=${timestamp}`,
+      `./${filename}?t=${timestamp}`,
+      `${filename}?t=${timestamp}`,
+      `/${filename}?t=${timestamp}`,
+    ];
+
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) {
+          const text = await res.text();
+          // Verify it is valid JSON and not a 404 HTML fallback page
+          if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed) ? parsed.length > 0 : parsed && typeof parsed === 'object') {
+              return parsed;
+            }
+          }
+        }
+      } catch {
+        // try next candidate
+      }
+    }
+    return null;
+  };
+
+  // Fetch latest products and config from cloud / server / catalog.json
+  const fetchLatestCatalog = async () => {
+    let synced = false;
+
+    // 1. Try server API /api/products
+    try {
+      const apiRes = await fetch('/api/products?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (Array.isArray(json.products) && json.products.length > 0) {
+          setIsServerSyncActive(true);
+          setProducts(json.products);
+          localStorage.setItem('strong_products', JSON.stringify(json.products));
+          synced = true;
+        }
+      }
+    } catch {
+      // server not available
+    }
+
+    // 2. Try server API /api/config
+    try {
+      const configRes = await fetch('/api/config?t=' + Date.now(), {
+        cache: 'no-store',
+      });
+      if (configRes.ok) {
+        const confJson = await configRes.json();
+        if (confJson && confJson.storeName) {
+          setConfig(confJson);
+          localStorage.setItem('strong_config', JSON.stringify(confJson));
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Fallback to catalog.json and config.json if server API wasn't available (e.g. on GitHub Pages)
+    if (!synced) {
+      try {
+        const staticData = await fetchJsonWithFallback('catalog.json');
+        if (Array.isArray(staticData) && staticData.length > 0) {
+          setProducts(staticData);
+          localStorage.setItem('strong_products', JSON.stringify(staticData));
+        }
+      } catch (e) {
+        console.warn('Could not fetch static catalog.json:', e);
+      }
+
+      try {
+        const staticConf = await fetchJsonWithFallback('config.json');
+        if (staticConf && staticConf.storeName) {
+          setConfig(staticConf);
+          localStorage.setItem('strong_config', JSON.stringify(staticConf));
+        }
+      } catch (e) {
+        console.warn('Could not fetch static config.json:', e);
+      }
+    }
+  };
+
+  // Sync on startup, when switching back to this tab/window, and periodically
+  useEffect(() => {
+    fetchLatestCatalog();
+
+    const handleWindowFocus = () => {
+      fetchLatestCatalog();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
+    // Poll every 20 seconds so mobile and desktop sync seamlessly in real-time
+    const interval = setInterval(() => {
+      fetchLatestCatalog();
+    }, 20000);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      clearInterval(interval);
+    };
   }, []);
 
   // 2. Navigation & UI state
@@ -224,36 +370,54 @@ export default function App() {
   const handleSaveProduct = (newOrEditedProduct: Product) => {
     setProducts((prev) => {
       const index = prev.findIndex((p) => p.id === newOrEditedProduct.id);
+      let updated: Product[];
       if (index > -1) {
-        const updated = [...prev];
+        updated = [...prev];
         updated[index] = newOrEditedProduct;
-        return updated;
+      } else {
+        updated = [newOrEditedProduct, ...prev];
       }
-      return [newOrEditedProduct, ...prev];
+      persistProducts(updated);
+      return updated;
     });
   };
 
   const handleDeleteProduct = (productId: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    setProducts((prev) => {
+      const updated = prev.filter((p) => p.id !== productId);
+      persistProducts(updated);
+      return updated;
+    });
   };
 
   const handleResetToDefaults = () => {
     setProducts(INITIAL_PRODUCTS);
     localStorage.removeItem('strong_products');
+    persistProducts(INITIAL_PRODUCTS);
   };
 
   const handleUpdateConfig = (newConfig: StoreConfig) => {
     setConfig(newConfig);
+    persistConfig(newConfig);
   };
 
   const handleImportProducts = (importedProducts: Product[]) => {
     setProducts(importedProducts);
+    persistProducts(importedProducts);
   };
 
   const totalCartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <div className="min-h-screen flex flex-col bg-neutral-950 text-neutral-100 selection:bg-amber-400 selection:text-neutral-950 font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* Toast Notification for Cross-Device Synchronization */}
+      {syncToast && (
+        <div className="fixed top-20 right-6 z-50 bg-amber-400 text-neutral-950 px-4 py-2.5 rounded-xl shadow-2xl font-bold text-xs flex items-center gap-2 border border-amber-300 animate-bounce">
+          <span className="w-2 h-2 rounded-full bg-neutral-950"></span>
+          {syncToast}
+        </div>
+      )}
+
       {/* Header with sticky navigation, cart badge, search, category pills and admin trigger */}
       <Header
         cartCount={totalCartCount}
@@ -405,6 +569,8 @@ export default function App() {
         config={config}
         onUpdateConfig={handleUpdateConfig}
         onImportProducts={handleImportProducts}
+        isServerSyncActive={isServerSyncActive}
+        onForceSync={fetchLatestCatalog}
       />
 
       {/* Footer */}
