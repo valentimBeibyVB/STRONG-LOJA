@@ -1,9 +1,9 @@
 [
   {
     "id": "strong-item-1789514038472",
-    "name": "testtt4",
+    "name": "bandeira",
     "category": "tshirts",
-    "price": 15100,
+    "price": 10000,
     "description": "affdfd",
     "details": [
       "Produção autêntica Strong Apparel",
@@ -24,10 +24,9 @@
       }
     ],
     "sizes": [
-      "S",
-      "XXL"
+      "S"
     ],
-    "inStock": false,
+    "inStock": true,
     "badge": "vamos"
   },
   {
@@ -64,7 +63,7 @@
     "id": "strong-tshirt-heavyweight",
     "name": "T-shirt Oversized Strong Heavyweight",
     "category": "tshirts",
-    "price": 10000,
+    "price": 8000,
     "originalPrice": 19500,
     "description": "T-shirt com corte oversized streetwear premium em algodão penteado 240g/m². Gola canelada encorpada de 3cm com logotipo STRONG bordado minimalista.",
     "details": [
@@ -188,15 +187,16 @@
   },
   {
     "id": "strong-bone-trucker",
-    "name": "Boné Strong de Rede",
+    "name": "Boné Strong Trucker Curved Visor",
     "category": "chapeus",
-    "price": 3500,
-    "originalPrice": 5000,
+    "price": 8500,
+    "originalPrice": 11000,
     "description": "Boné estilo Trucker com traseira em malha respirável, fecho snapback regulável e patch frontal bordado com relevo de alta definição.",
     "details": [
-      "Produção autêntica Strong Apparel",
-      "Acabamento e costuras de alta resistência",
-      "Corte moderno e confortável"
+      "Frente em Sarja premium estruturada",
+      "Traseira em tela mesh para ventilação máxima",
+      "Fecho regulável snapback de 7 pinos",
+      "Aba curva com 6 costuras de sustentação"
     ],
     "image": "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=1000&q=80",
     "colors": [
@@ -214,10 +214,6 @@
         "name": "Carmesim & Preto",
         "hex": "#991b1b",
         "image": "https://images.unsplash.com/photo-1521369909029-2afed882baee?auto=format&fit=crop&w=1000&q=80"
-      },
-      {
-        "name": "CInza",
-        "hex": "#5e5e5e"
       }
     ],
     "sizes": [
