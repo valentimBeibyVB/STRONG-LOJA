@@ -245,22 +245,28 @@ export default function App() {
     const timestamp = Date.now();
     const base = (import.meta as any).env?.BASE_URL || './';
     const normalizedBase = base.endsWith('/') ? base : base + '/';
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') : '';
 
     const candidateUrls = [
-      `${normalizedBase}${filename}?t=${timestamp}`,
       `./${filename}?t=${timestamp}`,
-      `${filename}?t=${timestamp}`,
+      `${normalizedBase}${filename}?t=${timestamp}`,
+      currentPath ? `${currentPath}/${filename}?t=${timestamp}` : '',
       `/${filename}?t=${timestamp}`,
-    ];
+      `${filename}?t=${timestamp}`,
+    ].filter(Boolean);
 
     for (const url of candidateUrls) {
       try {
-        const res = await fetch(url, { cache: 'no-store' });
+        const res = await fetch(url, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+        });
         if (res.ok) {
           const text = await res.text();
+          const trimmed = text.trim();
           // Verify it is valid JSON and not a 404 HTML fallback page
-          if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-            const parsed = JSON.parse(text);
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            const parsed = JSON.parse(trimmed);
             if (Array.isArray(parsed) ? parsed.length > 0 : parsed && typeof parsed === 'object') {
               return parsed;
             }
@@ -275,12 +281,12 @@ export default function App() {
 
   // Fetch latest products and config from cloud / server / catalog.json
   const fetchLatestCatalog = async (force = false, silent = false) => {
-    // If currently saving, do not let an incoming fetch overwrite!
+    // If currently saving in admin, do not let an incoming fetch overwrite!
     if (isSavingRef.current && !force) return;
 
-    let synced = false;
+    let syncedFromServer = false;
 
-    // 1. Try server API /api/products
+    // 1. Try server API /api/products (Full-stack Express mode)
     try {
       const apiRes = await fetch('/api/products?t=' + Date.now(), {
         cache: 'no-store',
@@ -288,13 +294,12 @@ export default function App() {
       });
       if (apiRes.ok) {
         const json = await apiRes.json();
-        if (Array.isArray(json.products)) {
+        if (Array.isArray(json.products) && json.products.length > 0) {
           setIsServerSyncActive(true);
           const serverVer = typeof json.version === 'number' ? json.version : 0;
           const currentLocalVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
 
-          // Only overwrite if force=true, or server version is strictly newer,
-          // or if local products are empty or unversioned (initial startup)
+          // Overwrite if force=true, or server version is strictly newer, or local products empty
           if (force || serverVer > currentLocalVer || currentLocalVer === 0) {
             setProducts(json.products);
             if (serverVer > 0) {
@@ -321,32 +326,12 @@ export default function App() {
                 }
               );
             }
-          } else {
-            // Local data is newer or identical to server data
-            if (force && !silent) {
-              addSyncLog(
-                'manual_sync',
-                'Verificação de Atualizações',
-                'success',
-                'server',
-                {
-                  details: `Catálogo local (v${currentLocalVer}) já está atualizado em relação ao servidor (v${serverVer}).`,
-                  itemCount: json.products.length,
-                  version: currentLocalVer,
-                }
-              );
-            }
           }
-          synced = true;
+          syncedFromServer = true;
         }
       }
     } catch (err: any) {
-      // server not available
-      if (force && !silent) {
-        addSyncLog('manual_sync', 'Verificação de Atualizações', 'warning', 'server', {
-          details: 'Servidor indisponível ou site rodando offline/estático.',
-        });
-      }
+      // server not available (e.g. GitHub Pages or static deployment)
     }
 
     // 2. Try server API /api/config
@@ -368,21 +353,77 @@ export default function App() {
       // ignore
     }
 
-    // 3. Fallback to catalog.json ONLY IF localStorage has NO saved products (initial seed)
-    if (!synced) {
-      const hasLocalSaved = localStorage.getItem('strong_products');
-      if (!hasLocalSaved) {
-        try {
-          const staticData = await fetchJsonWithFallback('catalog.json');
-          if (Array.isArray(staticData) && staticData.length > 0) {
-            setProducts(staticData);
-            try {
-              localStorage.setItem('strong_products', JSON.stringify(staticData));
-            } catch {}
+    // 3. GitHub Pages / Static Hosting Mode:
+    // When running statically on GitHub Pages, the store customer NEVER opens the ADM!
+    // They just open the link or refresh the page.
+    // Therefore, always fetch catalog.json directly from the repository/public folder
+    // and update the customer's view immediately!
+    if (!syncedFromServer) {
+      try {
+        const staticData = await fetchJsonWithFallback('catalog.json');
+        const catalogProducts: Product[] | null = Array.isArray(staticData)
+          ? staticData
+          : Array.isArray(staticData?.products)
+          ? staticData.products
+          : null;
+
+        if (catalogProducts && catalogProducts.length > 0) {
+          // If not currently in the middle of saving a product in the admin modal
+          if (!isSavingRef.current || force) {
+            setProducts((prev) => {
+              // Only update if there is an actual difference or on initial load / force
+              const hasChanged =
+                prev.length !== catalogProducts.length ||
+                JSON.stringify(prev.map((p) => ({ id: p.id, name: p.name, price: p.price, inStock: p.inStock }))) !==
+                  JSON.stringify(catalogProducts.map((p) => ({ id: p.id, name: p.name, price: p.price, inStock: p.inStock })));
+
+              if (hasChanged || force || prev.length === 0) {
+                try {
+                  localStorage.setItem('strong_products', JSON.stringify(catalogProducts));
+                } catch (e) {
+                  console.warn('LocalStorage warning:', e);
+                }
+                return catalogProducts;
+              }
+              return prev;
+            });
+
+            if (typeof staticData?.version === 'number' && staticData.version > 0) {
+              localCatalogVersionRef.current = staticData.version;
+              try {
+                localStorage.setItem('strong_catalog_version', staticData.version.toString());
+              } catch {}
+            }
+
+            if (!silent) {
+              addSyncLog(
+                'fetch_catalog',
+                'Catálogo Carregado do GitHub (catalog.json)',
+                'success',
+                'server',
+                {
+                  details: `Catálogo público com ${catalogProducts.length} artigos carregado diretamente do ficheiro publicado.`,
+                  itemCount: catalogProducts.length,
+                }
+              );
+            }
           }
-        } catch (e) {
-          console.warn('Could not fetch static catalog.json:', e);
         }
+      } catch (e) {
+        console.warn('Could not fetch static catalog.json:', e);
+      }
+
+      // Also fetch config.json from GitHub / static host
+      try {
+        const staticConfig = await fetchJsonWithFallback('config.json');
+        if (staticConfig && staticConfig.storeName && staticConfig.whatsappNumber) {
+          setConfig(staticConfig);
+          try {
+            localStorage.setItem('strong_config', JSON.stringify(staticConfig));
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('Could not fetch static config.json:', e);
       }
     }
   };
@@ -474,40 +515,46 @@ export default function App() {
     };
   }, []);
 
-  // Multi-device fallback check: fast polling (5s), window focus, phone screen unlock, and online events
+  // Multi-device fallback check: fast polling, window focus, phone screen unlock, and online events
   useEffect(() => {
-    fetchLatestCatalog();
+    // Immediately fetch latest catalog on mount
+    fetchLatestCatalog(true, true);
 
-    const checkServerVersion = async () => {
+    const checkUpdates = async () => {
       if (isSavingRef.current) return;
-      try {
-        const res = await fetch('/api/status?t=' + Date.now(), {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store' },
-        });
-        if (res.ok) {
-          const statusJson = await res.json();
-          setIsServerSyncActive(true);
-          const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
-          const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
-          if (serverVer > localVer || localVer === 0) {
-            fetchLatestCatalog(true, false);
+      if (isServerSyncActive) {
+        try {
+          const res = await fetch('/api/status?t=' + Date.now(), {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store' },
+          });
+          if (res.ok) {
+            const statusJson = await res.json();
+            const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
+            const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
+            if (serverVer > localVer || localVer === 0) {
+              fetchLatestCatalog(true, false);
+            }
+            return;
           }
+        } catch {
+          // Fall back to static check below
         }
-      } catch {
-        // Server offline or static host
       }
+
+      // Static / GitHub Pages mode: check catalog.json directly so customers always get updates
+      fetchLatestCatalog(false, true);
     };
 
     const handleActive = () => {
       if (!isSavingRef.current) {
-        checkServerVersion();
+        checkUpdates();
       }
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !isSavingRef.current) {
-        checkServerVersion();
+        checkUpdates();
       }
     };
 
@@ -515,8 +562,8 @@ export default function App() {
     window.addEventListener('online', handleActive);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Fast status check every 5 seconds to ensure changes reflect even if SSE connection drops
-    const interval = setInterval(checkServerVersion, 5000);
+    // Fast check every 10 seconds to ensure updates reflect automatically on customers' open devices
+    const interval = setInterval(checkUpdates, 10000);
 
     return () => {
       window.removeEventListener('focus', handleActive);
@@ -524,7 +571,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
     };
-  }, []);
+  }, [isServerSyncActive]);
 
   // 2. Navigation & UI state
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('todos');

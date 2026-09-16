@@ -295,6 +295,20 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setTimeout(() => setJsonExportSuccess(false), 3000);
   };
 
+  const [configExportSuccess, setConfigExportSuccess] = useState(false);
+  const handleExportConfigJSON = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', 'config.json');
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    setConfigExportSuccess(true);
+    setTimeout(() => setConfigExportSuccess(false), 3000);
+  };
+
   const handleCopyJSONOnly = () => {
     navigator.clipboard.writeText(JSON.stringify(products, null, 2));
     setJsonExportSuccess(true);
@@ -1206,21 +1220,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 )}
               </div>
 
-              {/* Explicação Clara: Por que só alterava no mesmo dispositivo? */}
+              {/* Explicação Clara: Como a Loja e o GitHub Funcionam para os Clientes */}
               <div className="p-4 rounded-xl bg-amber-400/10 border border-amber-400/30 space-y-2.5">
                 <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                   <KeyRound className="w-4 h-4" />
-                  Como fazer as alterações aparecerem em TODOS os telemóveis e computadores:
+                  Fluxo Oficial: ADM (Você) ➔ GitHub ➔ Clientes da Loja
                 </h4>
                 <p className="text-xs text-neutral-300 leading-relaxed">
-                  O <strong>GitHub Pages</strong> é uma hospedagem estática. Por segurança, os navegadores não conseguem gravar diretamente nos servidores do GitHub sem você enviar o arquivo. Por isso, quando você salva no computador, as alterações ficam salvas apenas na memória deste computador.
+                  A área da <strong>Loja</strong> é exclusiva para os seus clientes comprarem. Eles <strong>não têm acesso e desconhecem o ADM</strong>. Quando você publica os arquivos no GitHub, os clientes verão os novos produtos e preços <strong>automaticamente, bastando abrir o link ou atualizar o navegador</strong>, sem precisar de nenhuma ação manual!
                 </p>
                 <div className="p-3 rounded-lg bg-neutral-950/80 border border-neutral-800 space-y-2">
-                  <span className="text-xs font-bold text-white block">Siga estes 3 passos simples:</span>
+                  <span className="text-xs font-bold text-white block">Como atualizar a sua loja no GitHub:</span>
                   <ol className="text-xs text-neutral-300 list-decimal list-inside space-y-1.5 leading-relaxed">
-                    <li>No computador onde editou os produtos, clique em <strong className="text-amber-400">"Baixar Catálogo (JSON)"</strong> abaixo.</li>
-                    <li>Vá ao seu repositório no GitHub, abra a pasta <code className="text-amber-300">public/</code> e substitua o arquivo <code className="text-amber-300">catalog.json</code> pelo novo.</li>
-                    <li>Pronto! Em 1 a 2 minutos, <strong>qualquer telemóvel ou cliente que entrar no site verá os novos produtos e preços</strong>.</li>
+                    <li>Aqui no ADM, crie ou altere os produtos desejados.</li>
+                    <li>Clique em <strong className="text-amber-400">"Baixar Catálogo (catalog.json)"</strong> logo abaixo.</li>
+                    <li>No seu repositório GitHub, substitua o arquivo <code className="text-amber-300">public/catalog.json</code> pelo arquivo que acabou de baixar.</li>
+                    <li><strong>Pronto!</strong> Qualquer cliente que abrir o link da loja verá todos os novos produtos e preços imediatamente!</li>
                   </ol>
                 </div>
               </div>
@@ -1228,18 +1243,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Download className="w-4 h-4 text-amber-400" />
-                  Exportar Catálogo em JSON ({products.length} produtos carregados)
+                  Exportar Arquivos para o GitHub ({products.length} produtos carregados)
                 </h4>
                 <p className="text-xs text-neutral-400">
-                  Baixe todos os produtos e imagens atuais como um ficheiro JSON ou copie diretamente para colar no GitHub.
+                  Baixe os ficheiros JSON para colocar na pasta <code className="text-amber-300 font-mono">public/</code> do seu GitHub:
                 </p>
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   <button
                     onClick={handleExportJSON}
-                    className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-2 transition"
+                    className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-2 transition shadow-sm"
                   >
                     <Download className="w-4 h-4" />
                     Baixar Catálogo (catalog.json)
+                  </button>
+
+                  <button
+                    onClick={handleExportConfigJSON}
+                    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-2 border border-neutral-700 transition"
+                  >
+                    <Download className="w-4 h-4 text-amber-400" />
+                    Baixar Configurações (config.json)
                   </button>
 
                   <button
@@ -1252,7 +1275,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                   {jsonExportSuccess && (
                     <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Baixado e copiado!
+                      <Check className="w-3.5 h-3.5" /> Catálogo baixado!
+                    </span>
+                  )}
+                  {configExportSuccess && (
+                    <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Configurações baixadas!
                     </span>
                   )}
                 </div>
