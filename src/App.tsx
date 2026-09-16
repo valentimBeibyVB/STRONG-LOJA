@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { MessageCircle, ShoppingBag, Sparkles, Filter, AlertCircle, ArrowUp } from 'lucide-react';
-import { Product, ProductColor, CartItem, StoreConfig, ProductCategory } from './types';
+import { Product, ProductColor, CartItem, StoreConfig, ProductCategory, SyncLogEntry } from './types';
 import { INITIAL_PRODUCTS, DEFAULT_STORE_CONFIG } from './data/initialProducts';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
@@ -54,20 +54,79 @@ export default function App() {
   const [isServerSyncActive, setIsServerSyncActive] = useState<boolean>(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
 
-  // References to prevent race conditions during save and focus/polling events
-  const isSavingRef = React.useRef(false);
-  const localCatalogVersionRef = React.useRef<number>(() => {
+  // Activity & Diagnostic Sync Logs
+  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>(() => {
     try {
-      const v = localStorage.getItem('strong_catalog_version');
-      if (v) return parseInt(v, 10) || Date.now();
+      const saved = localStorage.getItem('strong_sync_logs');
+      if (saved) return JSON.parse(saved);
     } catch {
       // ignore
     }
-    return Date.now();
+    return [];
   });
 
+  const addSyncLog = (
+    type: SyncLogEntry['type'],
+    action: string,
+    status: SyncLogEntry['status'],
+    source: SyncLogEntry['source'],
+    options?: {
+      details?: string;
+      itemCount?: number;
+      version?: number;
+    }
+  ) => {
+    const newEntry: SyncLogEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      type,
+      action,
+      status,
+      source,
+      itemCount: options?.itemCount,
+      version: options?.version,
+      details: options?.details,
+    };
+    setSyncLogs((prev) => {
+      const updated = [newEntry, ...prev].slice(0, 50); // Keep last 50 events
+      try {
+        localStorage.setItem('strong_sync_logs', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  };
+
+  const handleClearSyncLogs = () => {
+    setSyncLogs([]);
+    try {
+      localStorage.removeItem('strong_sync_logs');
+    } catch {
+      // ignore
+    }
+  };
+
+  // References to prevent race conditions during save and focus/polling events
+  const isSavingRef = React.useRef(false);
+
+  const getInitialCatalogVersion = (): number => {
+    try {
+      const v = localStorage.getItem('strong_catalog_version');
+      if (v) {
+        const parsed = parseInt(v, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return 0;
+  };
+
+  const localCatalogVersionRef = React.useRef<number>(getInitialCatalogVersion());
+
   // Synchronize products to server & local storage
-  const persistProducts = async (newProducts: Product[]) => {
+  const persistProducts = async (newProducts: Product[], operationTitle = 'Salvar produtos') => {
     const newVer = Date.now();
     isSavingRef.current = true;
     localCatalogVersionRef.current = newVer;
@@ -75,9 +134,26 @@ export default function App() {
     try {
       localStorage.setItem('strong_products', JSON.stringify(newProducts));
       localStorage.setItem('strong_catalog_version', newVer.toString());
-    } catch (e) {
+      addSyncLog('save_products', 'Gravação em Armazenamento Local', 'success', 'local_storage', {
+        details: `${newProducts.length} artigos persistidos no navegador`,
+        itemCount: newProducts.length,
+        version: newVer,
+      });
+    } catch (e: any) {
       console.warn('LocalStorage error:', e);
+      addSyncLog('save_products', 'Gravação em Armazenamento Local', 'error', 'local_storage', {
+        details: e?.message || 'Erro ao gravar no localStorage',
+      });
     }
+
+    // Broadcast immediately across open tabs on the same browser/device
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const channel = new BroadcastChannel('strong_store_broadcast');
+        channel.postMessage({ type: 'PRODUCTS_UPDATED', version: newVer, products: newProducts });
+        channel.close();
+      }
+    } catch {}
 
     try {
       const res = await fetch('/api/products', {
@@ -87,17 +163,30 @@ export default function App() {
       });
       if (res.ok) {
         setIsServerSyncActive(true);
-        setSyncToast('Alterações salvas e sincronizadas!');
-        setTimeout(() => setSyncToast(null), 3000);
+        setSyncToast('Alterações salvas e propagadas para todos os dispositivos!');
+        setTimeout(() => setSyncToast(null), 3500);
+        addSyncLog('save_products', operationTitle, 'success', 'server', {
+          details: `Sincronizado com sucesso com o servidor. Todos os outros dispositivos conectados receberão a versão v${newVer} imediatamente via tempo real.`,
+          itemCount: newProducts.length,
+          version: newVer,
+        });
         return true;
+      } else {
+        const errorText = await res.text().catch(() => 'Status ' + res.status);
+        addSyncLog('save_products', operationTitle, 'warning', 'server', {
+          details: `Servidor retornou resposta inesperada (${res.status}): ${errorText}`,
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.log('Server not reachable (running static or offline):', err);
+      addSyncLog('save_products', operationTitle, 'warning', 'server', {
+        details: 'Servidor indisponível ou site rodando estático. Modificações seguras localmente no navegador.',
+      });
     } finally {
-      // Keep isSavingRef locked for 2 seconds to avoid any focus-event or immediate polling race
+      // Keep isSavingRef locked briefly to avoid echo race
       setTimeout(() => {
         isSavingRef.current = false;
-      }, 2000);
+      }, 1500);
     }
     return false;
   };
@@ -106,9 +195,24 @@ export default function App() {
   const persistConfig = async (newConfig: StoreConfig) => {
     try {
       localStorage.setItem('strong_config', JSON.stringify(newConfig));
-    } catch (e) {
+      addSyncLog('save_config', 'Configurações da Loja', 'success', 'local_storage', {
+        details: 'Configurações de WhatsApp e visual salvas localmente',
+      });
+    } catch (e: any) {
       console.warn('LocalStorage error:', e);
+      addSyncLog('save_config', 'Configurações da Loja', 'error', 'local_storage', {
+        details: e?.message || 'Erro ao gravar configurações',
+      });
     }
+
+    // Broadcast across tabs
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const channel = new BroadcastChannel('strong_store_broadcast');
+        channel.postMessage({ type: 'CONFIG_UPDATED', config: newConfig });
+        channel.close();
+      }
+    } catch {}
 
     try {
       const res = await fetch('/api/config', {
@@ -118,10 +222,20 @@ export default function App() {
       });
       if (res.ok) {
         setIsServerSyncActive(true);
+        addSyncLog('save_config', 'Configurações no Servidor', 'success', 'server', {
+          details: 'Configurações sincronizadas na nuvem com sucesso',
+        });
         return true;
+      } else {
+        addSyncLog('save_config', 'Configurações no Servidor', 'warning', 'server', {
+          details: `Servidor respondeu com código ${res.status}`,
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.log('Server not reachable for config sync');
+      addSyncLog('save_config', 'Configurações no Servidor', 'warning', 'server', {
+        details: 'Servidor offline ou modo estático.',
+      });
     }
     return false;
   };
@@ -160,8 +274,8 @@ export default function App() {
   };
 
   // Fetch latest products and config from cloud / server / catalog.json
-  const fetchLatestCatalog = async (force = false) => {
-    // If currently saving or user just made changes, do not let an incoming fetch overwrite!
+  const fetchLatestCatalog = async (force = false, silent = false) => {
+    // If currently saving, do not let an incoming fetch overwrite!
     if (isSavingRef.current && !force) return;
 
     let synced = false;
@@ -170,18 +284,18 @@ export default function App() {
     try {
       const apiRes = await fetch('/api/products?t=' + Date.now(), {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' },
+        headers: { 'Cache-Control': 'no-cache, no-store' },
       });
       if (apiRes.ok) {
         const json = await apiRes.json();
         if (Array.isArray(json.products)) {
           setIsServerSyncActive(true);
           const serverVer = typeof json.version === 'number' ? json.version : 0;
-          const currentLocalVer = localCatalogVersionRef.current || 0;
+          const currentLocalVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
 
-          // Only overwrite if force=true, or server version is strictly newer than our local version,
-          // or if local products are empty
-          if (force || serverVer > currentLocalVer) {
+          // Only overwrite if force=true, or server version is strictly newer,
+          // or if local products are empty or unversioned (initial startup)
+          if (force || serverVer > currentLocalVer || currentLocalVer === 0) {
             setProducts(json.products);
             if (serverVer > 0) {
               localCatalogVersionRef.current = serverVer;
@@ -194,18 +308,52 @@ export default function App() {
             } catch (e) {
               console.warn('LocalStorage warning:', e);
             }
+            if (!silent) {
+              addSyncLog(
+                'fetch_catalog',
+                force ? 'Sincronização em Tempo Real' : 'Detecção de Nova Versão Remota',
+                'success',
+                'server',
+                {
+                  details: `Recebidos ${json.products.length} produtos do servidor (v${serverVer})`,
+                  itemCount: json.products.length,
+                  version: serverVer,
+                }
+              );
+            }
+          } else {
+            // Local data is newer or identical to server data
+            if (force && !silent) {
+              addSyncLog(
+                'manual_sync',
+                'Verificação de Atualizações',
+                'success',
+                'server',
+                {
+                  details: `Catálogo local (v${currentLocalVer}) já está atualizado em relação ao servidor (v${serverVer}).`,
+                  itemCount: json.products.length,
+                  version: currentLocalVer,
+                }
+              );
+            }
           }
           synced = true;
         }
       }
-    } catch {
+    } catch (err: any) {
       // server not available
+      if (force && !silent) {
+        addSyncLog('manual_sync', 'Verificação de Atualizações', 'warning', 'server', {
+          details: 'Servidor indisponível ou site rodando offline/estático.',
+        });
+      }
     }
 
     // 2. Try server API /api/config
     try {
       const configRes = await fetch('/api/config?t=' + Date.now(), {
         cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store' },
       });
       if (configRes.ok) {
         const confJson = await configRes.json();
@@ -239,26 +387,141 @@ export default function App() {
     }
   };
 
-  // Sync on startup, when switching back to this tab/window, and periodically
+  // Real-time synchronization across all devices via Server-Sent Events (SSE)
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+
+    const setupSSE = () => {
+      try {
+        eventSource = new EventSource('/api/sync/events');
+
+        eventSource.addEventListener('connected', () => {
+          setIsServerSyncActive(true);
+        });
+
+        eventSource.addEventListener('catalog', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            const serverVer = data?.version;
+            // If another device made an admin change, reflect immediately on this device
+            if (!isSavingRef.current) {
+              setSyncToast('Catálogo atualizado em tempo real!');
+              setTimeout(() => setSyncToast(null), 3000);
+              fetchLatestCatalog(true, false);
+            }
+          } catch {
+            fetchLatestCatalog(true, false);
+          }
+        });
+
+        eventSource.addEventListener('config', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data?.config) {
+              setConfig(data.config);
+              try {
+                localStorage.setItem('strong_config', JSON.stringify(data.config));
+              } catch {}
+            }
+          } catch {}
+        });
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Retry connection in 3 seconds
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = setTimeout(setupSSE, 3000);
+        };
+      } catch {
+        // SSE not supported or network error
+      }
+    };
+
+    setupSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      clearTimeout(reconnectTimeout);
+    };
+  }, []);
+
+  // Sync across tabs on the same device via BroadcastChannel
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('strong_store_broadcast');
+
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'PRODUCTS_UPDATED') {
+        if (Array.isArray(event.data.products) && !isSavingRef.current) {
+          setProducts(event.data.products);
+          if (event.data.version) {
+            localCatalogVersionRef.current = event.data.version;
+          }
+        }
+      } else if (event.data?.type === 'CONFIG_UPDATED') {
+        if (event.data.config) {
+          setConfig(event.data.config);
+        }
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
+  }, []);
+
+  // Multi-device fallback check: fast polling (5s), window focus, phone screen unlock, and online events
   useEffect(() => {
     fetchLatestCatalog();
 
-    const handleWindowFocus = () => {
-      if (!isSavingRef.current) {
-        fetchLatestCatalog();
+    const checkServerVersion = async () => {
+      if (isSavingRef.current) return;
+      try {
+        const res = await fetch('/api/status?t=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+        });
+        if (res.ok) {
+          const statusJson = await res.json();
+          setIsServerSyncActive(true);
+          const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
+          const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
+          if (serverVer > localVer || localVer === 0) {
+            fetchLatestCatalog(true, false);
+          }
+        }
+      } catch {
+        // Server offline or static host
       }
     };
-    window.addEventListener('focus', handleWindowFocus);
 
-    // Poll every 20 seconds so mobile and desktop sync seamlessly in real-time
-    const interval = setInterval(() => {
+    const handleActive = () => {
       if (!isSavingRef.current) {
-        fetchLatestCatalog();
+        checkServerVersion();
       }
-    }, 20000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isSavingRef.current) {
+        checkServerVersion();
+      }
+    };
+
+    window.addEventListener('focus', handleActive);
+    window.addEventListener('online', handleActive);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Fast status check every 5 seconds to ensure changes reflect even if SSE connection drops
+    const interval = setInterval(checkServerVersion, 5000);
 
     return () => {
-      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('focus', handleActive);
+      window.removeEventListener('online', handleActive);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
     };
   }, []);
@@ -414,26 +677,42 @@ export default function App() {
     const prev = products;
     const index = prev.findIndex((p) => p.id === newOrEditedProduct.id);
     let updated: Product[];
-    if (index > -1) {
+    const isEdit = index > -1;
+    if (isEdit) {
       updated = [...prev];
       updated[index] = newOrEditedProduct;
     } else {
       updated = [newOrEditedProduct, ...prev];
     }
     setProducts(updated);
-    persistProducts(updated);
+    const op = isEdit ? `Editar produto "${newOrEditedProduct.name}"` : `Criar produto "${newOrEditedProduct.name}"`;
+    addSyncLog('save_products', op, 'success', 'local_storage', {
+      details: `${newOrEditedProduct.name} - ${newOrEditedProduct.price.toLocaleString('pt-AO')} Kz`,
+      itemCount: updated.length,
+    });
+    persistProducts(updated, op);
   };
 
   const handleDeleteProduct = (productId: string) => {
+    const target = products.find((p) => p.id === productId);
     const updated = products.filter((p) => p.id !== productId);
     setProducts(updated);
-    persistProducts(updated);
+    const op = `Apagar produto "${target?.name || productId}"`;
+    addSyncLog('delete_product', op, 'warning', 'local_storage', {
+      details: `Artigo removido. Restam ${updated.length} artigos no catálogo.`,
+      itemCount: updated.length,
+    });
+    persistProducts(updated, op);
   };
 
   const handleResetToDefaults = () => {
     setProducts(INITIAL_PRODUCTS);
     localStorage.removeItem('strong_products');
-    persistProducts(INITIAL_PRODUCTS);
+    addSyncLog('reset_defaults', 'Restaurar Catálogo Padrão', 'warning', 'local_storage', {
+      details: `Catálogo redefinido para a lista inicial de fábrica (${INITIAL_PRODUCTS.length} itens).`,
+      itemCount: INITIAL_PRODUCTS.length,
+    });
+    persistProducts(INITIAL_PRODUCTS, 'Restaurar catálogo padrão');
   };
 
   const handleUpdateConfig = (newConfig: StoreConfig) => {
@@ -443,7 +722,11 @@ export default function App() {
 
   const handleImportProducts = (importedProducts: Product[]) => {
     setProducts(importedProducts);
-    persistProducts(importedProducts);
+    addSyncLog('import_catalog', 'Importação de Catálogo JSON', 'success', 'local_storage', {
+      details: `Arquivo JSON importado com sucesso com ${importedProducts.length} itens.`,
+      itemCount: importedProducts.length,
+    });
+    persistProducts(importedProducts, `Importar catálogo (${importedProducts.length} produtos)`);
   };
 
   const totalCartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
@@ -611,7 +894,21 @@ export default function App() {
         onImportProducts={handleImportProducts}
         isServerSyncActive={isServerSyncActive}
         onForceSync={() => fetchLatestCatalog(true)}
+        syncLogs={syncLogs}
+        onClearSyncLogs={handleClearSyncLogs}
+        catalogVersion={localCatalogVersionRef.current}
       />
+
+      {/* Real-time Multi-device Sync Toast Notification */}
+      {syncToast && (
+        <div className="fixed top-24 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-neutral-900/95 border border-amber-400/40 text-neutral-100 text-xs font-semibold shadow-2xl shadow-black/50 backdrop-blur-md pointer-events-none transition-all">
+          <div className="relative flex items-center justify-center w-3 h-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </div>
+          <span>{syncToast}</span>
+        </div>
+      )}
 
       {/* Footer */}
       <Footer

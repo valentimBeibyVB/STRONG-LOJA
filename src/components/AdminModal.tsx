@@ -26,9 +26,11 @@ import {
   Cloud,
   RefreshCw,
   Wifi,
+  Activity,
 } from 'lucide-react';
-import { Product, ProductColor, StoreConfig } from '../types';
+import { Product, ProductColor, StoreConfig, SyncLogEntry } from '../types';
 import { formatPrice } from '../utils/whatsapp';
+import { ActivityLog } from './ActivityLog';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -42,6 +44,9 @@ interface AdminModalProps {
   onImportProducts: (products: Product[]) => void;
   isServerSyncActive?: boolean;
   onForceSync?: () => Promise<void>;
+  syncLogs?: SyncLogEntry[];
+  onClearSyncLogs?: () => void;
+  catalogVersion?: number;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -56,6 +61,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onImportProducts,
   isServerSyncActive = false,
   onForceSync,
+  syncLogs = [],
+  onClearSyncLogs = () => {},
+  catalogVersion,
 }) => {
   // Authentication State (Isolated from customer view)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -70,7 +78,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [showCode, setShowCode] = useState(false);
   const [showAdminPasswordInSettings, setShowAdminPasswordInSettings] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'settings' | 'github'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'settings' | 'github' | 'logs'>('products');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   // Form State for creating / editing product
@@ -536,6 +544,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         >
           <Download className="w-3.5 h-3.5" />
           Backup & GitHub
+        </button>
+
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'logs'
+              ? 'bg-amber-400 text-neutral-950 shadow-sm'
+              : 'bg-neutral-800/80 text-neutral-300 hover:bg-neutral-800'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          Histórico & Diagnóstico ({syncLogs.length})
         </button>
       </div>
 
@@ -1167,6 +1187,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       Recarregar Dados do Site (Limpar Cache)
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('logs')}
+                      className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs flex items-center gap-2 border border-neutral-700 transition"
+                      title="Abrir histórico detalhado e log de sincronização"
+                    >
+                      <Activity className="w-4 h-4 text-amber-400" />
+                      Ver Log de Atividades ({syncLogs.length})
+                    </button>
+
                     {syncFeedback && (
                       <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
                         <Check className="w-3.5 h-3.5" /> {syncFeedback}
@@ -1275,6 +1305,20 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* TAB 5: ACTIVITY LOG & SYNC DIAGNOSTICS */}
+          {activeTab === 'logs' && (
+            <ActivityLog
+              logs={syncLogs}
+              onClearLogs={onClearSyncLogs}
+              onRefreshSync={async () => {
+                if (onForceSync) await onForceSync();
+              }}
+              isServerSyncActive={isServerSyncActive}
+              localVersion={catalogVersion}
+              catalogCount={products.length}
+            />
           )}
         </div>
       </div>

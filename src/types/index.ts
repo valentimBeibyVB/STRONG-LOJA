@@ -54,3 +54,26 @@ export interface CheckoutCustomerInfo {
   notes: string;
   paymentMethod: string;
 }
+
+export type SyncEventType =
+  | 'save_products'
+  | 'delete_product'
+  | 'save_config'
+  | 'import_catalog'
+  | 'fetch_catalog'
+  | 'manual_sync'
+  | 'reset_defaults'
+  | 'purge_cache';
+
+export interface SyncLogEntry {
+  id: string;
+  timestamp: number;
+  type: SyncEventType;
+  action: string;
+  status: 'success' | 'warning' | 'error';
+  source: 'server' | 'local_storage' | 'static_catalog';
+  itemCount?: number;
+  version?: number;
+  details?: string;
+  device?: string;
+}
