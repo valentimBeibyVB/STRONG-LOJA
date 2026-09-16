@@ -107,6 +107,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [settingsForm, setSettingsForm] = useState<StoreConfig>({ ...config });
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
   const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
+  const [configExportSuccess, setConfigExportSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
@@ -295,7 +296,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setTimeout(() => setJsonExportSuccess(false), 3000);
   };
 
-  const [configExportSuccess, setConfigExportSuccess] = useState(false);
   const handleExportConfigJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
     const downloadAnchor = document.createElement('a');
