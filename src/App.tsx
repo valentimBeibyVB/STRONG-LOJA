@@ -50,14 +50,31 @@ export default function App() {
     return [];
   });
 
-  // Cloud Sync state
+  // Cloud Sync state & Versioning
   const [isServerSyncActive, setIsServerSyncActive] = useState<boolean>(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
 
+  // References to prevent race conditions during save and focus/polling events
+  const isSavingRef = React.useRef(false);
+  const localCatalogVersionRef = React.useRef<number>(() => {
+    try {
+      const v = localStorage.getItem('strong_catalog_version');
+      if (v) return parseInt(v, 10) || Date.now();
+    } catch {
+      // ignore
+    }
+    return Date.now();
+  });
+
   // Synchronize products to server & local storage
   const persistProducts = async (newProducts: Product[]) => {
+    const newVer = Date.now();
+    isSavingRef.current = true;
+    localCatalogVersionRef.current = newVer;
+
     try {
       localStorage.setItem('strong_products', JSON.stringify(newProducts));
+      localStorage.setItem('strong_catalog_version', newVer.toString());
     } catch (e) {
       console.warn('LocalStorage error:', e);
     }
@@ -66,16 +83,21 @@ export default function App() {
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProducts),
+        body: JSON.stringify({ products: newProducts, version: newVer }),
       });
       if (res.ok) {
         setIsServerSyncActive(true);
-        setSyncToast('Alterações salvas e sincronizadas com todos os dispositivos!');
-        setTimeout(() => setSyncToast(null), 3500);
+        setSyncToast('Alterações salvas e sincronizadas!');
+        setTimeout(() => setSyncToast(null), 3000);
         return true;
       }
     } catch (err) {
       console.log('Server not reachable (running static or offline):', err);
+    } finally {
+      // Keep isSavingRef locked for 2 seconds to avoid any focus-event or immediate polling race
+      setTimeout(() => {
+        isSavingRef.current = false;
+      }, 2000);
     }
     return false;
   };
@@ -138,7 +160,10 @@ export default function App() {
   };
 
   // Fetch latest products and config from cloud / server / catalog.json
-  const fetchLatestCatalog = async () => {
+  const fetchLatestCatalog = async (force = false) => {
+    // If currently saving or user just made changes, do not let an incoming fetch overwrite!
+    if (isSavingRef.current && !force) return;
+
     let synced = false;
 
     // 1. Try server API /api/products
@@ -149,10 +174,27 @@ export default function App() {
       });
       if (apiRes.ok) {
         const json = await apiRes.json();
-        if (Array.isArray(json.products) && json.products.length > 0) {
+        if (Array.isArray(json.products)) {
           setIsServerSyncActive(true);
-          setProducts(json.products);
-          localStorage.setItem('strong_products', JSON.stringify(json.products));
+          const serverVer = typeof json.version === 'number' ? json.version : 0;
+          const currentLocalVer = localCatalogVersionRef.current || 0;
+
+          // Only overwrite if force=true, or server version is strictly newer than our local version,
+          // or if local products are empty
+          if (force || serverVer > currentLocalVer) {
+            setProducts(json.products);
+            if (serverVer > 0) {
+              localCatalogVersionRef.current = serverVer;
+              try {
+                localStorage.setItem('strong_catalog_version', serverVer.toString());
+              } catch {}
+            }
+            try {
+              localStorage.setItem('strong_products', JSON.stringify(json.products));
+            } catch (e) {
+              console.warn('LocalStorage warning:', e);
+            }
+          }
           synced = true;
         }
       }
@@ -169,33 +211,30 @@ export default function App() {
         const confJson = await configRes.json();
         if (confJson && confJson.storeName) {
           setConfig(confJson);
-          localStorage.setItem('strong_config', JSON.stringify(confJson));
+          try {
+            localStorage.setItem('strong_config', JSON.stringify(confJson));
+          } catch {}
         }
       }
     } catch {
       // ignore
     }
 
-    // 3. Fallback to catalog.json and config.json if server API wasn't available (e.g. on GitHub Pages)
+    // 3. Fallback to catalog.json ONLY IF localStorage has NO saved products (initial seed)
     if (!synced) {
-      try {
-        const staticData = await fetchJsonWithFallback('catalog.json');
-        if (Array.isArray(staticData) && staticData.length > 0) {
-          setProducts(staticData);
-          localStorage.setItem('strong_products', JSON.stringify(staticData));
+      const hasLocalSaved = localStorage.getItem('strong_products');
+      if (!hasLocalSaved) {
+        try {
+          const staticData = await fetchJsonWithFallback('catalog.json');
+          if (Array.isArray(staticData) && staticData.length > 0) {
+            setProducts(staticData);
+            try {
+              localStorage.setItem('strong_products', JSON.stringify(staticData));
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('Could not fetch static catalog.json:', e);
         }
-      } catch (e) {
-        console.warn('Could not fetch static catalog.json:', e);
-      }
-
-      try {
-        const staticConf = await fetchJsonWithFallback('config.json');
-        if (staticConf && staticConf.storeName) {
-          setConfig(staticConf);
-          localStorage.setItem('strong_config', JSON.stringify(staticConf));
-        }
-      } catch (e) {
-        console.warn('Could not fetch static config.json:', e);
       }
     }
   };
@@ -205,13 +244,17 @@ export default function App() {
     fetchLatestCatalog();
 
     const handleWindowFocus = () => {
-      fetchLatestCatalog();
+      if (!isSavingRef.current) {
+        fetchLatestCatalog();
+      }
     };
     window.addEventListener('focus', handleWindowFocus);
 
     // Poll every 20 seconds so mobile and desktop sync seamlessly in real-time
     const interval = setInterval(() => {
-      fetchLatestCatalog();
+      if (!isSavingRef.current) {
+        fetchLatestCatalog();
+      }
     }, 20000);
 
     return () => {
@@ -368,26 +411,23 @@ export default function App() {
 
   // 5. Admin Handlers
   const handleSaveProduct = (newOrEditedProduct: Product) => {
-    setProducts((prev) => {
-      const index = prev.findIndex((p) => p.id === newOrEditedProduct.id);
-      let updated: Product[];
-      if (index > -1) {
-        updated = [...prev];
-        updated[index] = newOrEditedProduct;
-      } else {
-        updated = [newOrEditedProduct, ...prev];
-      }
-      persistProducts(updated);
-      return updated;
-    });
+    const prev = products;
+    const index = prev.findIndex((p) => p.id === newOrEditedProduct.id);
+    let updated: Product[];
+    if (index > -1) {
+      updated = [...prev];
+      updated[index] = newOrEditedProduct;
+    } else {
+      updated = [newOrEditedProduct, ...prev];
+    }
+    setProducts(updated);
+    persistProducts(updated);
   };
 
   const handleDeleteProduct = (productId: string) => {
-    setProducts((prev) => {
-      const updated = prev.filter((p) => p.id !== productId);
-      persistProducts(updated);
-      return updated;
-    });
+    const updated = products.filter((p) => p.id !== productId);
+    setProducts(updated);
+    persistProducts(updated);
   };
 
   const handleResetToDefaults = () => {
@@ -570,7 +610,7 @@ export default function App() {
         onUpdateConfig={handleUpdateConfig}
         onImportProducts={handleImportProducts}
         isServerSyncActive={isServerSyncActive}
-        onForceSync={fetchLatestCatalog}
+        onForceSync={() => fetchLatestCatalog(true)}
       />
 
       {/* Footer */}

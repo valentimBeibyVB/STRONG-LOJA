@@ -170,10 +170,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        // Resize canvas to keep reasonable localStorage footprint
+        // Resize canvas to keep reasonable localStorage footprint and fast sync
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
+        const MAX_WIDTH = 900;
+        const MAX_HEIGHT = 900;
         let width = img.width;
         let height = img.height;
 
@@ -189,18 +189,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           }
         }
 
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = Math.round(width);
+        canvas.height = Math.round(height);
         const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
+        ctx?.drawImage(img, 0, 0, Math.round(width), Math.round(height));
 
-        // Convert to webp/jpeg data url
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        // Convert to jpeg data url with efficient compression
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
         setFormImage(dataUrl);
-        // Also update the colors without specific images or update the first color's image
-        setFormColors((prevColors) =>
-          prevColors.map((c, idx) => (idx === 0 || !c.image ? { ...c, image: dataUrl } : c))
-        );
       };
       img.src = event.target?.result as string;
     };
@@ -242,6 +238,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     e.preventDefault();
     if (!formName.trim()) return;
 
+    const existingProduct = editingProductId ? products.find((p) => p.id === editingProductId) : null;
+
     const productPayload: Product = {
       id: editingProductId || `strong-item-${Date.now()}`,
       name: formName.trim(),
@@ -249,7 +247,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       price: Number(formPrice),
       originalPrice: formOriginalPrice ? Number(formOriginalPrice) : undefined,
       description: formDescription.trim() || 'Peça da coleção oficial da marca de vestuário Strong.',
-      details: [
+      details: existingProduct?.details || [
         'Produção autêntica Strong Apparel',
         'Acabamento e costuras de alta resistência',
         'Corte moderno e confortável'
@@ -619,15 +617,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
                       <button
-                        onClick={() => handleStartEdit(item)}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartEdit(item);
+                        }}
                         className="p-2 text-neutral-400 hover:text-amber-400 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
                         title="Editar Peça"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm(`Tem a certeza que deseja eliminar "${item.name}"?`)) {
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Tem a certeza que deseja eliminar "${item.name}"?`)) {
                             onDeleteProduct(item.id);
                           }
                         }}

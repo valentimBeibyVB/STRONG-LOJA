@@ -3,7 +3,7 @@
     "id": "strong-item-1789514038472",
     "name": "testtt4",
     "category": "tshirts",
-    "price": 15000,
+    "price": 15100,
     "description": "affdfd",
     "details": [
       "Produção autêntica Strong Apparel",
@@ -24,9 +24,10 @@
       }
     ],
     "sizes": [
-      "S"
+      "S",
+      "XXL"
     ],
-    "inStock": true,
+    "inStock": false,
     "badge": "vamos"
   },
   {
@@ -63,7 +64,7 @@
     "id": "strong-tshirt-heavyweight",
     "name": "T-shirt Oversized Strong Heavyweight",
     "category": "tshirts",
-    "price": 8000,
+    "price": 10000,
     "originalPrice": 19500,
     "description": "T-shirt com corte oversized streetwear premium em algodão penteado 240g/m². Gola canelada encorpada de 3cm com logotipo STRONG bordado minimalista.",
     "details": [
@@ -187,16 +188,15 @@
   },
   {
     "id": "strong-bone-trucker",
-    "name": "Boné Strong Trucker Curved Visor",
+    "name": "Boné Strong de Rede",
     "category": "chapeus",
-    "price": 8500,
-    "originalPrice": 11000,
+    "price": 3500,
+    "originalPrice": 5000,
     "description": "Boné estilo Trucker com traseira em malha respirável, fecho snapback regulável e patch frontal bordado com relevo de alta definição.",
     "details": [
-      "Frente em Sarja premium estruturada",
-      "Traseira em tela mesh para ventilação máxima",
-      "Fecho regulável snapback de 7 pinos",
-      "Aba curva com 6 costuras de sustentação"
+      "Produção autêntica Strong Apparel",
+      "Acabamento e costuras de alta resistência",
+      "Corte moderno e confortável"
     ],
     "image": "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=1000&q=80",
     "colors": [
@@ -214,6 +214,10 @@
         "name": "Carmesim & Preto",
         "hex": "#991b1b",
         "image": "https://images.unsplash.com/photo-1521369909029-2afed882baee?auto=format&fit=crop&w=1000&q=80"
+      },
+      {
+        "name": "CInza",
+        "hex": "#5e5e5e"
       }
     ],
     "sizes": [

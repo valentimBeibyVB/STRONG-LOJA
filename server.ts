@@ -63,6 +63,10 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid products format. Must be an array." });
       }
 
+      // If incoming contains a version number, use it, otherwise generate now
+      const newVersion = typeof incoming?.version === "number" ? incoming.version : Date.now();
+      catalogVersion = newVersion;
+
       // Save to public/catalog.json
       fs.writeFileSync(catalogFilePath, JSON.stringify(productsList, null, 2), "utf-8");
 
@@ -76,7 +80,7 @@ async function startServer() {
         }
       }
 
-      // Also automatically update src/data/initialProducts.ts so exported code / GitHub builds have the latest catalog
+      // Also automatically update src/data/initialProducts.ts only if content differs
       const initialProductsPath = path.join(process.cwd(), "src", "data", "initialProducts.ts");
       if (fs.existsSync(initialProductsPath)) {
         try {
@@ -98,14 +102,15 @@ async function startServer() {
               }, null, 2);
 
           const newCode = `import { Product, StoreConfig } from "../types";\n\nexport const DEFAULT_STORE_CONFIG: StoreConfig = ${configStr};\n\nexport const INITIAL_PRODUCTS: Product[] = ${JSON.stringify(productsList, null, 2)};\n`;
-          fs.writeFileSync(initialProductsPath, newCode, "utf-8");
-          console.log("[API] Synchronized products with src/data/initialProducts.ts");
+          if (newCode !== currentContent) {
+            fs.writeFileSync(initialProductsPath, newCode, "utf-8");
+            console.log("[API] Synchronized products with src/data/initialProducts.ts");
+          }
         } catch (srcErr) {
           console.warn("Could not sync to src/data/initialProducts.ts:", srcErr);
         }
       }
 
-      catalogVersion = Date.now();
       console.log(`[API] Catalog updated with ${productsList.length} items (v: ${catalogVersion})`);
 
       return res.json({
