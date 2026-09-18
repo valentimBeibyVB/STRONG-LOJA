@@ -134,7 +134,6 @@ export default function App() {
     try {
       localStorage.setItem('strong_products', JSON.stringify(newProducts));
       localStorage.setItem('strong_catalog_version', newVer.toString());
-      localStorage.setItem('strong_has_local_edits', 'true');
       addSyncLog('save_products', 'Gravação em Armazenamento Local', 'success', 'local_storage', {
         details: `${newProducts.length} artigos persistidos no navegador`,
         itemCount: newProducts.length,
@@ -181,13 +180,13 @@ export default function App() {
     } catch (err: any) {
       console.log('Server not reachable (running static or offline):', err);
       addSyncLog('save_products', operationTitle, 'warning', 'server', {
-        details: 'Servidor indisponível ou site rodando estático. Modificações seguras localmente no navegador.',
+        details: 'Servidor indisponível ou site rodando estático. Modificações salvas localmente no navegador.',
       });
     } finally {
       // Keep isSavingRef locked briefly to avoid echo race
       setTimeout(() => {
         isSavingRef.current = false;
-      }, 1500);
+      }, 1200);
     }
     return false;
   };
@@ -295,43 +294,43 @@ export default function App() {
       });
       if (apiRes.ok) {
         const json = await apiRes.json();
-        if (Array.isArray(json.products)) {
+        if (Array.isArray(json.products) && json.products.length > 0) {
           setIsServerSyncActive(true);
           syncedFromServer = true;
           const serverVer = typeof json.version === 'number' ? json.version : 0;
-          const currentLocalVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
-          const hasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
 
-          // Overwrite ONLY if:
-          // a) force === true (manual sync), OR
-          // b) server version is strictly newer (serverVer > currentLocalVer), OR
-          // c) initial load and we have no local admin edits recorded (currentLocalVer === 0 && !hasLocalEdits)
-          if (force || serverVer > currentLocalVer || (currentLocalVer === 0 && !hasLocalEdits)) {
-            setProducts(json.products);
-            if (serverVer > 0) {
-              localCatalogVersionRef.current = serverVer;
-              try {
-                localStorage.setItem('strong_catalog_version', serverVer.toString());
-              } catch {}
+          setProducts((currentProducts) => {
+            const isDifferent = JSON.stringify(currentProducts) !== JSON.stringify(json.products);
+            if (force || isDifferent || (serverVer > 0 && serverVer !== localCatalogVersionRef.current)) {
+              return json.products;
             }
+            return currentProducts;
+          });
+
+          if (serverVer > 0) {
+            localCatalogVersionRef.current = serverVer;
             try {
-              localStorage.setItem('strong_products', JSON.stringify(json.products));
-            } catch (e) {
-              console.warn('LocalStorage warning:', e);
-            }
-            if (!silent) {
-              addSyncLog(
-                'fetch_catalog',
-                force ? 'Sincronização com Servidor' : 'Detecção de Nova Versão Remota',
-                'success',
-                'server',
-                {
-                  details: `Recebidos ${json.products.length} produtos do servidor (v${serverVer})`,
-                  itemCount: json.products.length,
-                  version: serverVer,
-                }
-              );
-            }
+              localStorage.setItem('strong_catalog_version', serverVer.toString());
+            } catch {}
+          }
+          try {
+            localStorage.setItem('strong_products', JSON.stringify(json.products));
+          } catch (e) {
+            console.warn('LocalStorage warning:', e);
+          }
+
+          if (!silent) {
+            addSyncLog(
+              'fetch_catalog',
+              force ? 'Sincronização com Servidor' : 'Detecção de Nova Versão Remota',
+              'success',
+              'server',
+              {
+                details: `Recebidos ${json.products.length} produtos do servidor (v${serverVer})`,
+                itemCount: json.products.length,
+                version: serverVer,
+              }
+            );
           }
         }
       }
@@ -358,10 +357,7 @@ export default function App() {
       // ignore
     }
 
-    // 3. GitHub Pages / Static Hosting Mode:
-    // In static mode, there is no server API.
-    // If the admin user has edited or deleted products locally in this browser,
-    // background polling MUST NOT overwrite their local changes with the static catalog.json!
+    // 3. Fallback for pure static hosting mode (catalog.json / version.json)
     if (!syncedFromServer) {
       try {
         let remoteVersion = 0;
@@ -372,67 +368,59 @@ export default function App() {
           }
         } catch {}
 
-        const currentLocalVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
-        const hasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
-        const hasStoredProducts = !!localStorage.getItem('strong_products');
+        const staticData = await fetchJsonWithFallback('catalog.json');
+        const catalogProducts: Product[] | null = Array.isArray(staticData)
+          ? staticData
+          : Array.isArray(staticData?.products)
+          ? staticData.products
+          : null;
 
-        // Apply static catalog.json only if:
-        // 1) User explicitly requested force sync (force === true), OR
-        // 2) A strictly newer version was published on GitHub (remoteVersion > 0 && remoteVersion > currentLocalVer), OR
-        // 3) New visitor with no local edits and no stored products
-        const shouldApply = force || (remoteVersion > 0 && remoteVersion > currentLocalVer) || (!hasStoredProducts && !hasLocalEdits);
-
-        if (shouldApply) {
-          const staticData = await fetchJsonWithFallback('catalog.json');
-          const catalogProducts: Product[] | null = Array.isArray(staticData)
-            ? staticData
-            : Array.isArray(staticData?.products)
-            ? staticData.products
-            : null;
-
-          if (catalogProducts && (!isSavingRef.current || force)) {
-            setProducts(catalogProducts);
-            try {
-              localStorage.setItem('strong_products', JSON.stringify(catalogProducts));
-            } catch (e) {
-              console.warn('LocalStorage warning:', e);
+        if (catalogProducts && catalogProducts.length > 0 && (!isSavingRef.current || force)) {
+          setProducts((currentProducts) => {
+            const isDifferent = JSON.stringify(currentProducts) !== JSON.stringify(catalogProducts);
+            if (force || isDifferent) {
+              return catalogProducts;
             }
+            return currentProducts;
+          });
 
-            const finalVer = remoteVersion > 0 ? remoteVersion : (typeof staticData?.version === 'number' ? staticData.version : Date.now());
-            localCatalogVersionRef.current = finalVer;
-            try {
-              localStorage.setItem('strong_catalog_version', finalVer.toString());
-            } catch {}
+          try {
+            localStorage.setItem('strong_products', JSON.stringify(catalogProducts));
+          } catch (e) {
+            console.warn('LocalStorage warning:', e);
+          }
 
-            if (!silent) {
-              addSyncLog(
-                'fetch_catalog',
-                'Catálogo Carregado (catalog.json)',
-                'success',
-                'server',
-                {
-                  details: `Catálogo público com ${catalogProducts.length} artigos carregado diretamente do ficheiro publicado.`,
-                  itemCount: catalogProducts.length,
-                }
-              );
-            }
+          const finalVer = remoteVersion > 0 ? remoteVersion : (typeof staticData?.version === 'number' ? staticData.version : Date.now());
+          localCatalogVersionRef.current = finalVer;
+          try {
+            localStorage.setItem('strong_catalog_version', finalVer.toString());
+          } catch {}
+
+          if (!silent) {
+            addSyncLog(
+              'fetch_catalog',
+              'Catálogo Carregado (catalog.json)',
+              'success',
+              'server',
+              {
+                details: `Catálogo público com ${catalogProducts.length} artigos carregado diretamente do ficheiro publicado.`,
+                itemCount: catalogProducts.length,
+              }
+            );
           }
         }
       } catch (e) {
         console.warn('Could not fetch static catalog.json:', e);
       }
 
-      // Also fetch config.json from GitHub / static host only if not locally modified or forced
+      // Also fetch config.json from static host if available
       try {
-        const hasLocalConfig = !!localStorage.getItem('strong_config');
-        if (force || !hasLocalConfig) {
-          const staticConfig = await fetchJsonWithFallback('config.json');
-          if (staticConfig && staticConfig.storeName && staticConfig.whatsappNumber) {
-            setConfig(staticConfig);
-            try {
-              localStorage.setItem('strong_config', JSON.stringify(staticConfig));
-            } catch {}
-          }
+        const staticConfig = await fetchJsonWithFallback('config.json');
+        if (staticConfig && staticConfig.storeName && staticConfig.whatsappNumber) {
+          setConfig(staticConfig);
+          try {
+            localStorage.setItem('strong_config', JSON.stringify(staticConfig));
+          } catch {}
         }
       } catch (e) {
         console.warn('Could not fetch static config.json:', e);
@@ -457,18 +445,24 @@ export default function App() {
           try {
             const data = JSON.parse(event.data);
             const serverVer = data?.version;
-            // Ignore echo from this device's own save
-            if (typeof serverVer === 'number' && serverVer <= (localCatalogVersionRef.current || 0)) {
+
+            // Ignore echo only if this device is actively in the middle of pressing save
+            if (isSavingRef.current) {
               return;
             }
-            // If another device made an admin change, reflect immediately on this device
+
+            // If incoming version matches our current version, avoid duplicate toasts
+            if (typeof serverVer === 'number' && serverVer === localCatalogVersionRef.current) {
+              return;
+            }
+
+            setSyncToast('Catálogo atualizado em tempo real!');
+            setTimeout(() => setSyncToast(null), 3000);
+            fetchLatestCatalog(true, false);
+          } catch {
             if (!isSavingRef.current) {
-              setSyncToast('Catálogo atualizado em tempo real!');
-              setTimeout(() => setSyncToast(null), 3000);
               fetchLatestCatalog(true, false);
             }
-          } catch {
-            fetchLatestCatalog(true, false);
           }
         });
 
@@ -531,39 +525,31 @@ export default function App() {
     };
   }, []);
 
-  // Multi-device fallback check: fast polling, window focus, phone screen unlock, and online events
+  // Multi-device synchronization check: fast polling, window focus, phone screen unlock, and online events
   useEffect(() => {
-    // On initial mount: only force fetch from static if this device has no local admin edits
-    const hasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
-    fetchLatestCatalog(!hasLocalEdits, true);
+    // On initial mount: always fetch latest catalog from server
+    fetchLatestCatalog(true, true);
 
     const checkUpdates = async () => {
       if (isSavingRef.current) return;
-      if (isServerSyncActive) {
-        try {
-          const res = await fetch('/api/status?t=' + Date.now(), {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store' },
-          });
-          if (res.ok) {
-            const statusJson = await res.json();
-            const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
-            const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
-            if (serverVer > localVer) {
-              fetchLatestCatalog(true, false);
-            }
-            return;
+      try {
+        const res = await fetch('/api/status?t=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+        });
+        if (res.ok) {
+          const statusJson = await res.json();
+          const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
+          const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
+          if (serverVer !== localVer || localVer === 0) {
+            fetchLatestCatalog(true, true);
           }
-        } catch {
-          // Fall back to static check below
+          return;
         }
+      } catch {
+        // Server not available, fall back to static check
       }
-
-      // Static / GitHub Pages mode: only check if this device does not have local admin edits
-      const currentHasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
-      if (!currentHasLocalEdits) {
-        fetchLatestCatalog(false, true);
-      }
+      fetchLatestCatalog(false, true);
     };
 
     const handleActive = () => {
@@ -582,8 +568,8 @@ export default function App() {
     window.addEventListener('online', handleActive);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Fast check every 10 seconds to ensure updates reflect automatically on customers' open devices
-    const interval = setInterval(checkUpdates, 10000);
+    // Fast check every 4 seconds to ensure updates reflect automatically on customers' open devices
+    const interval = setInterval(checkUpdates, 4000);
 
     return () => {
       window.removeEventListener('focus', handleActive);
@@ -591,7 +577,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
     };
-  }, [isServerSyncActive]);
+  }, []);
 
   // 2. Navigation & UI state
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('todos');

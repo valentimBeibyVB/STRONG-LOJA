@@ -1233,33 +1233,32 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 )}
               </div>
 
-              {/* Explicação Clara: Como a Loja e o GitHub Funcionam para os Clientes */}
-              <div className="p-4 rounded-xl bg-amber-400/10 border border-amber-400/30 space-y-2.5">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <KeyRound className="w-4 h-4" />
-                  Fluxo Oficial: ADM (Você) ➔ GitHub ➔ Clientes da Loja
+              {/* Explicação Clara: Sincronização Automática em Tempo Real */}
+              <div className="p-4 rounded-xl bg-emerald-400/10 border border-emerald-400/30 space-y-2.5">
+                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  Sincronização em Tempo Real Ativa (Automática)
                 </h4>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  A área da <strong>Loja</strong> é exclusiva para os seus clientes comprarem. Eles <strong>não têm acesso e desconhecem o ADM</strong>. Quando você publica os arquivos no GitHub, os clientes verão os novos produtos e preços <strong>automaticamente, bastando abrir o link ou atualizar o navegador</strong>, sem precisar de nenhuma ação manual!
+                <p className="text-xs text-neutral-200 leading-relaxed">
+                  Tudo o que você editar, cadastrar ou apagar no seu computador é <strong>salvo imediatamente no servidor da loja</strong>. Todos os clientes que acessarem a loja pelo telemóvel ou por outro computador receberão as novidades <strong>na mesma hora, sem precisar baixar nenhum arquivo e sem complicações</strong>.
                 </p>
-                <div className="p-3 rounded-lg bg-neutral-950/80 border border-neutral-800 space-y-2">
-                  <span className="text-xs font-bold text-white block">Como atualizar a sua loja no GitHub:</span>
-                  <ol className="text-xs text-neutral-300 list-decimal list-inside space-y-1.5 leading-relaxed">
-                    <li>Aqui no ADM, crie ou altere os produtos desejados.</li>
-                    <li>Clique em <strong className="text-amber-400">"Baixar Catálogo (catalog.json)"</strong> logo abaixo.</li>
-                    <li>No seu repositório GitHub, substitua o arquivo <code className="text-amber-300">public/catalog.json</code> pelo arquivo que acabou de baixar.</li>
-                    <li><strong>Pronto!</strong> Qualquer cliente que abrir o link da loja verá todos os novos produtos e preços imediatamente!</li>
-                  </ol>
+                <div className="p-3 rounded-lg bg-neutral-950/80 border border-neutral-800 space-y-1.5">
+                  <span className="text-xs font-bold text-white block">Como funciona para os telemóveis e outros computadores:</span>
+                  <ul className="text-xs text-neutral-300 list-disc list-inside space-y-1 leading-relaxed">
+                    <li>Ao salvar qualquer artigo aqui, o servidor atualiza o catálogo automaticamente.</li>
+                    <li>Qualquer telemóvel com a loja aberta recebe o aviso e atualiza o ecrã instantaneamente.</li>
+                    <li>Novos visitantes no telemóvel já abrem a loja com os produtos e preços mais recentes.</li>
+                  </ul>
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Download className="w-4 h-4 text-amber-400" />
-                  Exportar Arquivos para o GitHub ({products.length} produtos carregados)
+                  Backup Opcional em Arquivo JSON ({products.length} produtos carregados)
                 </h4>
                 <p className="text-xs text-neutral-400">
-                  Baixe os ficheiros JSON para colocar na pasta <code className="text-amber-300 font-mono">public/</code> do seu GitHub:
+                  (Opcional) Caso deseje guardar uma cópia de segurança no seu computador ou subir manualmente para um repositório:
                 </p>
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   <button
