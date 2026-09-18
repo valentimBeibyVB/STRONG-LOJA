@@ -291,6 +291,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     downloadAnchor.click();
     downloadAnchor.remove();
 
+    // Also download version.json so customer devices detect the new publication
+    const newVer = Date.now();
+    const versionPayload = { version: newVer, updatedAt: new Date().toISOString() };
+    const versionStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(versionPayload, null, 2));
+    const versionAnchor = document.createElement('a');
+    versionAnchor.setAttribute('href', versionStr);
+    versionAnchor.setAttribute('download', 'version.json');
+    document.body.appendChild(versionAnchor);
+    versionAnchor.click();
+    versionAnchor.remove();
+
     navigator.clipboard.writeText(JSON.stringify(products, null, 2));
     setJsonExportSuccess(true);
     setTimeout(() => setJsonExportSuccess(false), 3000);
@@ -319,6 +330,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     if (confirm('Deseja limpar o cache guardado neste navegador e recarregar os dados do arquivo catalog.json publicado no site?')) {
       localStorage.removeItem('strong_products');
       localStorage.removeItem('strong_config');
+      localStorage.removeItem('strong_has_local_edits');
+      localStorage.removeItem('strong_catalog_version');
       if (onForceSync) {
         await onForceSync();
       } else {

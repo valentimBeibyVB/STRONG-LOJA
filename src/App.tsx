@@ -22,7 +22,7 @@ export default function App() {
       const saved = localStorage.getItem('strong_products');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.error('Error loading stored products:', e);
@@ -134,6 +134,7 @@ export default function App() {
     try {
       localStorage.setItem('strong_products', JSON.stringify(newProducts));
       localStorage.setItem('strong_catalog_version', newVer.toString());
+      localStorage.setItem('strong_has_local_edits', 'true');
       addSyncLog('save_products', 'Gravação em Armazenamento Local', 'success', 'local_storage', {
         details: `${newProducts.length} artigos persistidos no navegador`,
         itemCount: newProducts.length,
@@ -294,13 +295,18 @@ export default function App() {
       });
       if (apiRes.ok) {
         const json = await apiRes.json();
-        if (Array.isArray(json.products) && json.products.length > 0) {
+        if (Array.isArray(json.products)) {
           setIsServerSyncActive(true);
+          syncedFromServer = true;
           const serverVer = typeof json.version === 'number' ? json.version : 0;
           const currentLocalVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
+          const hasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
 
-          // Overwrite if force=true, or server version is strictly newer, or local products empty
-          if (force || serverVer > currentLocalVer || currentLocalVer === 0) {
+          // Overwrite ONLY if:
+          // a) force === true (manual sync), OR
+          // b) server version is strictly newer (serverVer > currentLocalVer), OR
+          // c) initial load and we have no local admin edits recorded (currentLocalVer === 0 && !hasLocalEdits)
+          if (force || serverVer > currentLocalVer || (currentLocalVer === 0 && !hasLocalEdits)) {
             setProducts(json.products);
             if (serverVer > 0) {
               localCatalogVersionRef.current = serverVer;
@@ -316,7 +322,7 @@ export default function App() {
             if (!silent) {
               addSyncLog(
                 'fetch_catalog',
-                force ? 'Sincronização em Tempo Real' : 'Detecção de Nova Versão Remota',
+                force ? 'Sincronização com Servidor' : 'Detecção de Nova Versão Remota',
                 'success',
                 'server',
                 {
@@ -327,7 +333,6 @@ export default function App() {
               );
             }
           }
-          syncedFromServer = true;
         }
       }
     } catch (err: any) {
@@ -354,51 +359,55 @@ export default function App() {
     }
 
     // 3. GitHub Pages / Static Hosting Mode:
-    // When running statically on GitHub Pages, the store customer NEVER opens the ADM!
-    // They just open the link or refresh the page.
-    // Therefore, always fetch catalog.json directly from the repository/public folder
-    // and update the customer's view immediately!
+    // In static mode, there is no server API.
+    // If the admin user has edited or deleted products locally in this browser,
+    // background polling MUST NOT overwrite their local changes with the static catalog.json!
     if (!syncedFromServer) {
       try {
-        const staticData = await fetchJsonWithFallback('catalog.json');
-        const catalogProducts: Product[] | null = Array.isArray(staticData)
-          ? staticData
-          : Array.isArray(staticData?.products)
-          ? staticData.products
-          : null;
+        let remoteVersion = 0;
+        try {
+          const versionData = await fetchJsonWithFallback('version.json');
+          if (typeof versionData?.version === 'number') {
+            remoteVersion = versionData.version;
+          }
+        } catch {}
 
-        if (catalogProducts && catalogProducts.length > 0) {
-          // If not currently in the middle of saving a product in the admin modal
-          if (!isSavingRef.current || force) {
-            setProducts((prev) => {
-              // Only update if there is an actual difference or on initial load / force
-              const hasChanged =
-                prev.length !== catalogProducts.length ||
-                JSON.stringify(prev.map((p) => ({ id: p.id, name: p.name, price: p.price, inStock: p.inStock }))) !==
-                  JSON.stringify(catalogProducts.map((p) => ({ id: p.id, name: p.name, price: p.price, inStock: p.inStock })));
+        const currentLocalVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
+        const hasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
+        const hasStoredProducts = !!localStorage.getItem('strong_products');
 
-              if (hasChanged || force || prev.length === 0) {
-                try {
-                  localStorage.setItem('strong_products', JSON.stringify(catalogProducts));
-                } catch (e) {
-                  console.warn('LocalStorage warning:', e);
-                }
-                return catalogProducts;
-              }
-              return prev;
-            });
+        // Apply static catalog.json only if:
+        // 1) User explicitly requested force sync (force === true), OR
+        // 2) A strictly newer version was published on GitHub (remoteVersion > 0 && remoteVersion > currentLocalVer), OR
+        // 3) New visitor with no local edits and no stored products
+        const shouldApply = force || (remoteVersion > 0 && remoteVersion > currentLocalVer) || (!hasStoredProducts && !hasLocalEdits);
 
-            if (typeof staticData?.version === 'number' && staticData.version > 0) {
-              localCatalogVersionRef.current = staticData.version;
-              try {
-                localStorage.setItem('strong_catalog_version', staticData.version.toString());
-              } catch {}
+        if (shouldApply) {
+          const staticData = await fetchJsonWithFallback('catalog.json');
+          const catalogProducts: Product[] | null = Array.isArray(staticData)
+            ? staticData
+            : Array.isArray(staticData?.products)
+            ? staticData.products
+            : null;
+
+          if (catalogProducts && (!isSavingRef.current || force)) {
+            setProducts(catalogProducts);
+            try {
+              localStorage.setItem('strong_products', JSON.stringify(catalogProducts));
+            } catch (e) {
+              console.warn('LocalStorage warning:', e);
             }
+
+            const finalVer = remoteVersion > 0 ? remoteVersion : (typeof staticData?.version === 'number' ? staticData.version : Date.now());
+            localCatalogVersionRef.current = finalVer;
+            try {
+              localStorage.setItem('strong_catalog_version', finalVer.toString());
+            } catch {}
 
             if (!silent) {
               addSyncLog(
                 'fetch_catalog',
-                'Catálogo Carregado do GitHub (catalog.json)',
+                'Catálogo Carregado (catalog.json)',
                 'success',
                 'server',
                 {
@@ -413,14 +422,17 @@ export default function App() {
         console.warn('Could not fetch static catalog.json:', e);
       }
 
-      // Also fetch config.json from GitHub / static host
+      // Also fetch config.json from GitHub / static host only if not locally modified or forced
       try {
-        const staticConfig = await fetchJsonWithFallback('config.json');
-        if (staticConfig && staticConfig.storeName && staticConfig.whatsappNumber) {
-          setConfig(staticConfig);
-          try {
-            localStorage.setItem('strong_config', JSON.stringify(staticConfig));
-          } catch {}
+        const hasLocalConfig = !!localStorage.getItem('strong_config');
+        if (force || !hasLocalConfig) {
+          const staticConfig = await fetchJsonWithFallback('config.json');
+          if (staticConfig && staticConfig.storeName && staticConfig.whatsappNumber) {
+            setConfig(staticConfig);
+            try {
+              localStorage.setItem('strong_config', JSON.stringify(staticConfig));
+            } catch {}
+          }
         }
       } catch (e) {
         console.warn('Could not fetch static config.json:', e);
@@ -445,6 +457,10 @@ export default function App() {
           try {
             const data = JSON.parse(event.data);
             const serverVer = data?.version;
+            // Ignore echo from this device's own save
+            if (typeof serverVer === 'number' && serverVer <= (localCatalogVersionRef.current || 0)) {
+              return;
+            }
             // If another device made an admin change, reflect immediately on this device
             if (!isSavingRef.current) {
               setSyncToast('Catálogo atualizado em tempo real!');
@@ -517,8 +533,9 @@ export default function App() {
 
   // Multi-device fallback check: fast polling, window focus, phone screen unlock, and online events
   useEffect(() => {
-    // Immediately fetch latest catalog on mount
-    fetchLatestCatalog(true, true);
+    // On initial mount: only force fetch from static if this device has no local admin edits
+    const hasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
+    fetchLatestCatalog(!hasLocalEdits, true);
 
     const checkUpdates = async () => {
       if (isSavingRef.current) return;
@@ -532,7 +549,7 @@ export default function App() {
             const statusJson = await res.json();
             const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
             const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
-            if (serverVer > localVer || localVer === 0) {
+            if (serverVer > localVer) {
               fetchLatestCatalog(true, false);
             }
             return;
@@ -542,8 +559,11 @@ export default function App() {
         }
       }
 
-      // Static / GitHub Pages mode: check catalog.json directly so customers always get updates
-      fetchLatestCatalog(false, true);
+      // Static / GitHub Pages mode: only check if this device does not have local admin edits
+      const currentHasLocalEdits = localStorage.getItem('strong_has_local_edits') === 'true';
+      if (!currentHasLocalEdits) {
+        fetchLatestCatalog(false, true);
+      }
     };
 
     const handleActive = () => {
@@ -755,6 +775,9 @@ export default function App() {
   const handleResetToDefaults = () => {
     setProducts(INITIAL_PRODUCTS);
     localStorage.removeItem('strong_products');
+    localStorage.removeItem('strong_has_local_edits');
+    localStorage.removeItem('strong_catalog_version');
+    localCatalogVersionRef.current = 0;
     addSyncLog('reset_defaults', 'Restaurar Catálogo Padrão', 'warning', 'local_storage', {
       details: `Catálogo redefinido para a lista inicial de fábrica (${INITIAL_PRODUCTS.length} itens).`,
       itemCount: INITIAL_PRODUCTS.length,

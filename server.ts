@@ -180,37 +180,6 @@ async function startServer() {
         }
       }
 
-      // Also automatically update src/data/initialProducts.ts only if content differs
-      const initialProductsPath = path.join(process.cwd(), "src", "data", "initialProducts.ts");
-      if (fs.existsSync(initialProductsPath)) {
-        try {
-          const currentContent = fs.readFileSync(initialProductsPath, "utf-8");
-          const configMatch = currentContent.match(/export const DEFAULT_STORE_CONFIG: StoreConfig = (\{[\s\S]*?\});/);
-          const configStr = configMatch
-            ? configMatch[1]
-            : JSON.stringify({
-                storeName: "STRONG",
-                tagline: "STREETWEAR & ESSENTIAL APPAREL",
-                whatsappNumber: "244923456789",
-                countryCode: "+244",
-                currencySymbol: "Kz",
-                currencyPosition: "suffix",
-                welcomeMessage: "Olá Strong! Vim através da vossa loja online e gostaria de finalizar a seguinte encomenda:",
-                instagramHandle: "@strong.brand",
-                address: "Luanda, Angola | Entregas para todo o país",
-                adminPassword: "admin",
-              }, null, 2);
-
-          const newCode = `import { Product, StoreConfig } from "../types";\n\nexport const DEFAULT_STORE_CONFIG: StoreConfig = ${configStr};\n\nexport const INITIAL_PRODUCTS: Product[] = ${JSON.stringify(productsList, null, 2)};\n`;
-          if (newCode !== currentContent) {
-            fs.writeFileSync(initialProductsPath, newCode, "utf-8");
-            console.log("[API] Synchronized products with src/data/initialProducts.ts");
-          }
-        } catch (srcErr) {
-          console.warn("Could not sync to src/data/initialProducts.ts:", srcErr);
-        }
-      }
-
       console.log(`[API] Catalog updated with ${productsList.length} items (v: ${catalogVersion})`);
 
       // Immediately notify all other connected devices in real-time
