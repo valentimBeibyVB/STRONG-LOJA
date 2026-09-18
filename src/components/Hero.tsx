@@ -1,13 +1,31 @@
 import React from 'react';
-import { ArrowRight, CheckCircle2, MessageCircle, Sparkles, Truck } from 'lucide-react';
-import { ProductCategory } from '../types';
+import { ArrowRight, CheckCircle2, Eye, MessageCircle, Sparkles, Star, Truck } from 'lucide-react';
+import { Product, ProductCategory, StoreConfig } from '../types';
 
 interface HeroProps {
   onSelectCategory: (category: ProductCategory) => void;
   whatsappNumber: string;
+  featuredProduct?: Product | null;
+  onViewDetails?: (product: Product) => void;
+  config?: StoreConfig;
 }
 
-export const Hero: React.FC<HeroProps> = ({ onSelectCategory, whatsappNumber }) => {
+export const Hero: React.FC<HeroProps> = ({
+  onSelectCategory,
+  whatsappNumber,
+  featuredProduct,
+  onViewDetails,
+  config,
+}) => {
+  const currencySymbol = config?.currencySymbol || 'Kz';
+  const currencyPosition = config?.currencyPosition || 'suffix';
+  const subtitle = config?.featuredSubtitle || featuredProduct?.badge || 'Destaque Oficial';
+
+  const formatPrice = (val: number) => {
+    const formatted = val.toLocaleString('pt-PT');
+    return currencyPosition === 'prefix' ? `${currencySymbol} ${formatted}` : `${formatted} ${currencySymbol}`;
+  };
+
   return (
     <section id="hero-section" className="relative overflow-hidden bg-neutral-900/50 border-b border-neutral-800 py-12 lg:py-16">
       {/* Background ambient lighting effects */}
@@ -100,30 +118,71 @@ export const Hero: React.FC<HeroProps> = ({ onSelectCategory, whatsappNumber }) 
           {/* Right Column Featured Visual Showcase */}
           <div className="lg:col-span-5 relative">
             <div className="relative mx-auto max-w-md lg:max-w-none rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl">
-              <div className="aspect-[4/5] relative overflow-hidden group">
+              <div
+                className="aspect-[4/5] relative overflow-hidden group cursor-pointer"
+                onClick={() => {
+                  if (featuredProduct && onViewDetails) {
+                    onViewDetails(featuredProduct);
+                  }
+                }}
+              >
                 <img
-                  src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80"
-                  alt="Strong Brand Streetwear"
+                  src={
+                    featuredProduct?.image ||
+                    'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80'
+                  }
+                  alt={featuredProduct?.name || `${config?.storeName || 'Strong'} Streetwear`}
                   className="w-full h-full object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-transparent" />
-                
-                {/* Floating tags */}
-                <div className="absolute top-4 left-4">
-                  <span className="bg-neutral-950/80 backdrop-blur-md text-amber-400 border border-amber-400/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
-                    NOVA COLEÇÃO
+                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/25 to-transparent" />
+
+                {/* Floating badge */}
+                <div className="absolute top-4 left-4 flex items-center gap-2">
+                  <span className="bg-neutral-950/90 backdrop-blur-md text-amber-400 border border-amber-400/40 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
+                    <Star className="w-3.5 h-3.5 fill-amber-400" />
+                    {subtitle}
                   </span>
+                  {featuredProduct?.inStock === false && (
+                    <span className="bg-red-500/90 text-white px-2 py-0.5 rounded text-[10px] font-bold">
+                      Esgotado
+                    </span>
+                  )}
                 </div>
 
-                <div className="absolute bottom-4 left-4 right-4 bg-neutral-950/90 backdrop-blur-md p-4 rounded-xl border border-neutral-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-amber-400 font-bold uppercase tracking-wider">Destaque da Semana</p>
-                      <h3 className="text-sm font-black text-white">T-shirt Heavyweight + Bucket Hat</h3>
+                {/* Bottom card details */}
+                <div className="absolute bottom-4 left-4 right-4 bg-neutral-950/95 backdrop-blur-md p-4 rounded-xl border border-neutral-800/90 shadow-2xl transition group-hover:border-amber-400/40">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        {subtitle}
+                      </p>
+                      <h3 className="text-base font-black text-white truncate mt-0.5">
+                        {featuredProduct ? featuredProduct.name : `${config?.storeName || 'Strong'} Collection`}
+                      </h3>
+                      {featuredProduct && (
+                        <p className="text-xs font-black text-amber-400 mt-1">
+                          {formatPrice(featuredProduct.price)}
+                        </p>
+                      )}
                     </div>
-                    <span className="text-xs font-extrabold bg-neutral-800 text-neutral-200 px-2.5 py-1 rounded">
-                      STRONG STYLE
-                    </span>
+
+                    {featuredProduct && onViewDetails ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewDetails(featuredProduct);
+                        }}
+                        className="px-3 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black text-xs flex items-center gap-1.5 shrink-0 shadow-md transition transform group-hover:scale-105"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Ver Peça</span>
+                      </button>
+                    ) : (
+                      <span className="text-xs font-extrabold bg-neutral-800 text-neutral-200 px-2.5 py-1 rounded shrink-0">
+                        {config?.storeName || 'STRONG'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

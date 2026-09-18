@@ -675,6 +675,19 @@ export default function App() {
     });
   }, [products, selectedCategory, searchQuery]);
 
+  // Featured Product calculation (selected in Admin via config.featuredProductId or product.isFeatured)
+  const featuredProduct = useMemo(() => {
+    if (config.featuredProductId) {
+      const found = products.find((p) => p.id === config.featuredProductId);
+      if (found) return found;
+    }
+    const byProp = products.find((p) => p.isFeatured);
+    if (byProp) return byProp;
+    const byBadge = products.find((p) => p.badge?.toLowerCase().includes('destaque'));
+    if (byBadge) return byBadge;
+    return products[0] || null;
+  }, [products, config.featuredProductId]);
+
   // 4. Cart Handlers
   const handleAddToCart = (
     product: Product,
@@ -813,6 +826,9 @@ export default function App() {
       <Hero
         onSelectCategory={setSelectedCategory}
         whatsappNumber={config.whatsappNumber}
+        featuredProduct={featuredProduct}
+        onViewDetails={(prod) => setDetailProduct(prod)}
+        config={config}
       />
 
       {/* Main Catalog Section */}

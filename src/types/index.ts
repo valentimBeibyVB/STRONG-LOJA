@@ -19,6 +19,7 @@ export interface Product {
   sizes: string[];
   inStock: boolean;
   badge?: string; // e.g. "Novo", "Destaque", "Limitado"
+  isFeatured?: boolean; // Produto destacado na loja
   createdAt?: number;
 }
 
@@ -45,6 +46,8 @@ export interface StoreConfig {
   instagramHandle?: string;
   address?: string;
   adminPassword?: string;
+  featuredProductId?: string; // ID do produto em destaque principal
+  featuredSubtitle?: string; // Título/badge customizado do destaque (ex: "Destaque da Coleção")
 }
 
 export interface CheckoutCustomerInfo {

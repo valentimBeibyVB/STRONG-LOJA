@@ -8,5 +8,7 @@
   "welcomeMessage": "Olá Strong! Vim através da vossa loja online e gostaria de finalizar a seguinte encomenda:",
   "instagramHandle": "@strong.brand",
   "address": "Luanda, Angola | Entregas para todo o país",
-  "adminPassword": "admin"
+  "adminPassword": "admin",
+  "featuredProductId": "strong-item-1789514038472",
+  "featuredSubtitle": "Destaque da Coleção"
 }

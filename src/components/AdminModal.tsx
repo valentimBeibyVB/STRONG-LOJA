@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   X,
   Plus,
@@ -27,6 +27,9 @@ import {
   RefreshCw,
   Wifi,
   Activity,
+  Star,
+  Search,
+  Sparkles,
 } from 'lucide-react';
 import { Product, ProductColor, StoreConfig, SyncLogEntry } from '../types';
 import { formatPrice } from '../utils/whatsapp';
@@ -78,7 +81,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [showCode, setShowCode] = useState(false);
   const [showAdminPasswordInSettings, setShowAdminPasswordInSettings] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'settings' | 'github' | 'logs'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'featured' | 'settings' | 'github' | 'logs'>('products');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   // Form State for creating / editing product
@@ -90,6 +93,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [formImage, setFormImage] = useState('');
   const [formBadge, setFormBadge] = useState('');
   const [formInStock, setFormInStock] = useState(true);
+  const [formIsFeatured, setFormIsFeatured] = useState(false);
+
+  // Featured Product Area State
+  const [featuredSearchQuery, setFeaturedSearchQuery] = useState('');
+  const [featuredCategoryFilter, setFeaturedCategoryFilter] = useState<'todos' | 'tshirts' | 'chapeus' | 'hoodies'>('todos');
+  const [featuredSubtitleInput, setFeaturedSubtitleInput] = useState(config.featuredSubtitle || 'Destaque da Coleção');
+  const [featuredFeedback, setFeaturedFeedback] = useState<string | null>(null);
+
+  // Products Tab Search & Filter State
+  const [adminProductSearchQuery, setAdminProductSearchQuery] = useState('');
+  const [adminProductCategoryFilter, setAdminProductCategoryFilter] = useState<'todos' | 'tshirts' | 'chapeus' | 'hoodies'>('todos');
 
   // Colors list for the current product
   const [formColors, setFormColors] = useState<ProductColor[]>([
@@ -108,6 +122,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
   const [jsonExportSuccess, setJsonExportSuccess] = useState(false);
   const [configExportSuccess, setConfigExportSuccess] = useState(false);
+  const [initialProductsExportSuccess, setInitialProductsExportSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
@@ -117,7 +132,98 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Sync settings form when config changes
   useEffect(() => {
     setSettingsForm({ ...config });
+    if (config.featuredSubtitle) {
+      setFeaturedSubtitleInput(config.featuredSubtitle);
+    }
   }, [config]);
+
+  // Current Featured Product
+  const currentFeaturedProduct = useMemo(() => {
+    if (config.featuredProductId) {
+      const found = products.find((p) => p.id === config.featuredProductId);
+      if (found) return found;
+    }
+    return products.find((p) => p.isFeatured) || null;
+  }, [products, config.featuredProductId]);
+
+  // Filtered products for featured selection grid
+  const filteredFeaturedProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchCat = featuredCategoryFilter === 'todos' || p.category === featuredCategoryFilter;
+      const q = featuredSearchQuery.toLowerCase().trim();
+      const matchQuery =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (p.badge && p.badge.toLowerCase().includes(q));
+      return matchCat && matchQuery;
+    });
+  }, [products, featuredCategoryFilter, featuredSearchQuery]);
+
+  // Filtered products for products list tab
+  const filteredAdminProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchCat = adminProductCategoryFilter === 'todos' || p.category === adminProductCategoryFilter;
+      const q = adminProductSearchQuery.toLowerCase().trim();
+      const matchQuery =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.badge && p.badge.toLowerCase().includes(q)) ||
+        (p.colors && p.colors.some((c) => c.name.toLowerCase().includes(q)));
+      return matchCat && matchQuery;
+    });
+  }, [products, adminProductCategoryFilter, adminProductSearchQuery]);
+
+  // Handlers for Featured Products
+  const handleSelectFeaturedProduct = (productId: string) => {
+    const targetProduct = products.find((p) => p.id === productId);
+    if (!targetProduct) return;
+
+    const updatedConfig: StoreConfig = {
+      ...config,
+      featuredProductId: productId,
+      featuredSubtitle: featuredSubtitleInput.trim() || config.featuredSubtitle || 'Destaque da Coleção',
+    };
+    onUpdateConfig(updatedConfig);
+
+    const updatedProducts = products.map((p) => ({
+      ...p,
+      isFeatured: p.id === productId,
+    }));
+    onImportProducts(updatedProducts);
+
+    setFeaturedFeedback(`"${targetProduct.name}" foi selecionado como produto em destaque!`);
+    setTimeout(() => setFeaturedFeedback(null), 3500);
+  };
+
+  const handleRemoveFeaturedProduct = () => {
+    const updatedConfig: StoreConfig = {
+      ...config,
+      featuredProductId: undefined,
+    };
+    onUpdateConfig(updatedConfig);
+
+    const updatedProducts = products.map((p) => ({
+      ...p,
+      isFeatured: false,
+    }));
+    onImportProducts(updatedProducts);
+
+    setFeaturedFeedback('Produto em destaque foi removido.');
+    setTimeout(() => setFeaturedFeedback(null), 3500);
+  };
+
+  const handleSaveFeaturedSubtitle = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedConfig: StoreConfig = {
+      ...config,
+      featuredSubtitle: featuredSubtitleInput.trim() || 'Destaque da Coleção',
+    };
+    onUpdateConfig(updatedConfig);
+    setFeaturedFeedback('Título da etiqueta de destaque atualizado!');
+    setTimeout(() => setFeaturedFeedback(null), 3000);
+  };
 
   const handleManualSync = async () => {
     if (!onForceSync) return;
@@ -147,6 +253,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setFormImage(product.image);
     setFormBadge(product.badge || '');
     setFormInStock(product.inStock);
+    setFormIsFeatured(product.id === config.featuredProductId || Boolean(product.isFeatured));
     setFormColors(product.colors && product.colors.length > 0 ? [...product.colors] : [{ name: 'Preto', hex: '#000000' }]);
     setFormSizes(product.sizes && product.sizes.length > 0 ? [...product.sizes] : ['S', 'M', 'L', 'XL']);
     setActiveTab('new');
@@ -163,6 +270,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setFormImage('https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80');
     setFormBadge('');
     setFormInStock(true);
+    setFormIsFeatured(false);
     setFormColors([
       { name: 'Preto', hex: '#121212' },
       { name: 'Branco', hex: '#ffffff' },
@@ -266,9 +374,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       sizes: formSizes,
       inStock: formInStock,
       badge: formBadge.trim() || undefined,
+      isFeatured: formIsFeatured,
     };
 
     onSaveProduct(productPayload);
+
+    if (formIsFeatured) {
+      onUpdateConfig({
+        ...config,
+        featuredProductId: productPayload.id,
+      });
+    } else if (config.featuredProductId === productPayload.id) {
+      onUpdateConfig({
+        ...config,
+        featuredProductId: undefined,
+      });
+    }
+
     handleResetForm();
     setActiveTab('products');
   };
@@ -318,6 +440,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
     setConfigExportSuccess(true);
     setTimeout(() => setConfigExportSuccess(false), 3000);
+  };
+
+  const handleExportInitialProductsTS = () => {
+    const fileContent = `import { Product, StoreConfig } from "../types";\n\n` +
+      `export const DEFAULT_STORE_CONFIG: StoreConfig = ${JSON.stringify(config, null, 2)};\n\n` +
+      `export const INITIAL_PRODUCTS: Product[] = ${JSON.stringify(products, null, 2)};\n`;
+    const dataStr = 'data:text/typescript;charset=utf-8,' + encodeURIComponent(fileContent);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', 'initialProducts.ts');
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    setInitialProductsExportSuccess(true);
+    setTimeout(() => setInitialProductsExportSuccess(false), 3000);
   };
 
   const handleCopyJSONOnly = () => {
@@ -550,6 +688,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('featured')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'featured'
+              ? 'bg-amber-400 text-neutral-950 shadow-sm'
+              : 'bg-neutral-800/80 text-neutral-300 hover:bg-neutral-800'
+          }`}
+          title="Escolher qual produto deve estar em destaque no topo da loja"
+        >
+          <Star className={`w-3.5 h-3.5 ${currentFeaturedProduct ? 'text-amber-400 fill-amber-400' : ''}`} />
+          <span>Produto em Destaque</span>
+          {currentFeaturedProduct && (
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab('settings')}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'settings'
@@ -611,86 +765,190 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {products.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-3.5 p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 items-center justify-between group hover:border-neutral-700 transition"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-16 h-16 object-cover rounded-lg bg-neutral-900 shrink-0 border border-neutral-800"
-                    />
+              {/* Search & Category Filter Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-neutral-900/60 p-3 rounded-xl border border-neutral-800">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar por nome, cor, descrição..."
+                    value={adminProductSearchQuery}
+                    onChange={(e) => setAdminProductSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
 
-                    <div className="flex-1 min-w-0 pr-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-neutral-800 text-amber-400">
-                          {item.category === 'tshirts' ? 'T-Shirt' : item.category === 'chapeus' ? 'Chapéu/Boné' : 'Moletom'}
-                        </span>
-                        {item.badge && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-xs font-bold text-white truncate mt-1">{item.name}</h4>
-                      <p className="text-xs font-extrabold text-amber-400 mt-0.5">
-                        {formatPrice(item.price, config)}
-                      </p>
-
-                      {/* Color count & Size badges */}
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex -space-x-1">
-                          {item.colors.slice(0, 4).map((c, i) => (
-                            <span
-                              key={i}
-                              className="w-3.5 h-3.5 rounded-full border border-black inline-block"
-                              style={{ backgroundColor: c.hex }}
-                              title={c.name}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-neutral-400">
-                          {item.colors.length} {item.colors.length === 1 ? 'cor' : 'cores'}
-                        </span>
-                        <span className="text-neutral-600">•</span>
-                        <span className="text-[10px] text-neutral-400 truncate">
-                          {item.sizes.join(', ')}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartEdit(item);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-amber-400 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
-                        title="Editar Peça"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (window.confirm(`Tem a certeza que deseja eliminar "${item.name}"?`)) {
-                            onDeleteProduct(item.id);
-                          }
-                        }}
-                        className="p-2 text-neutral-400 hover:text-red-400 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
-                        title="Eliminar Peça"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'todos', label: 'Todos' },
+                    { id: 'tshirts', label: 'T-Shirts' },
+                    { id: 'chapeus', label: 'Chapéus / Bonés' },
+                    { id: 'hoodies', label: 'Hoodies' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setAdminProductCategoryFilter(cat.id as any)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition whitespace-nowrap ${
+                        adminProductCategoryFilter === cat.id
+                          ? 'bg-amber-400 text-neutral-950 shadow-sm'
+                          : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Counter status badge */}
+              <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
+                <span>
+                  A mostrar <strong className="text-white">{filteredAdminProducts.length}</strong> de <strong className="text-amber-400">{products.length}</strong> produtos no catálogo
+                </span>
+                {(adminProductSearchQuery || adminProductCategoryFilter !== 'todos') && (
+                  <button
+                    onClick={() => {
+                      setAdminProductSearchQuery('');
+                      setAdminProductCategoryFilter('todos');
+                    }}
+                    className="text-amber-400 hover:underline text-[11px]"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+
+              {filteredAdminProducts.length === 0 ? (
+                <div className="p-8 text-center text-neutral-500 bg-neutral-950/40 rounded-xl border border-neutral-800 space-y-2">
+                  <p className="text-sm font-bold text-neutral-300">Nenhum produto encontrado com os filtros selecionados.</p>
+                  <p className="text-xs text-neutral-500">Tente pesquisar com outro termo ou limpe os filtros para ver todo o catálogo.</p>
+                  <button
+                    onClick={() => {
+                      setAdminProductSearchQuery('');
+                      setAdminProductCategoryFilter('todos');
+                    }}
+                    className="px-3 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-amber-400 mt-2 inline-block"
+                  >
+                    Ver Todos os {products.length} Produtos
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {filteredAdminProducts.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex gap-3.5 p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 items-center justify-between group hover:border-neutral-700 transition"
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-16 h-16 object-cover rounded-lg bg-neutral-900 shrink-0 border border-neutral-800"
+                      />
+
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-neutral-800 text-amber-400">
+                            {item.category === 'tshirts' ? 'T-Shirt' : item.category === 'chapeus' ? 'Chapéu/Boné' : 'Moletom'}
+                          </span>
+                          {(item.id === config.featuredProductId || item.isFeatured) && (
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-neutral-950 flex items-center gap-1 shadow-sm">
+                              <Star className="w-2.5 h-2.5 fill-neutral-950" />
+                              DESTAQUE
+                            </span>
+                          )}
+                          {item.badge && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-xs font-bold text-white truncate mt-1">{item.name}</h4>
+                        <p className="text-xs font-extrabold text-amber-400 mt-0.5">
+                          {formatPrice(item.price, config)}
+                        </p>
+
+                        {/* Color count & Size badges */}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex -space-x-1">
+                            {(item.colors || []).slice(0, 4).map((c, i) => (
+                              <span
+                                key={i}
+                                className="w-3.5 h-3.5 rounded-full border border-black inline-block"
+                                style={{ backgroundColor: c.hex }}
+                                title={c.name}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-neutral-400">
+                            {(item.colors || []).length} {(item.colors || []).length === 1 ? 'cor' : 'cores'}
+                          </span>
+                          <span className="text-neutral-600">•</span>
+                          <span className="text-[10px] text-neutral-400 truncate">
+                            {(item.sizes || []).join(', ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Star Highlight Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (item.id === config.featuredProductId || item.isFeatured) {
+                              handleRemoveFeaturedProduct();
+                            } else {
+                              handleSelectFeaturedProduct(item.id);
+                            }
+                          }}
+                          className={`p-2 rounded-lg transition ${
+                            item.id === config.featuredProductId || item.isFeatured
+                              ? 'text-amber-400 bg-amber-950/80 border border-amber-400/50 hover:bg-amber-900/80'
+                              : 'text-neutral-400 hover:text-amber-400 bg-neutral-900 hover:bg-neutral-800'
+                          }`}
+                          title={
+                            item.id === config.featuredProductId || item.isFeatured
+                              ? 'Artigo em destaque ativo. Clica para retirar dos destaques.'
+                              : 'Definir este artigo como Produto em Destaque no topo da loja'
+                          }
+                        >
+                          <Star className={`w-4 h-4 ${item.id === config.featuredProductId || item.isFeatured ? 'fill-amber-400' : ''}`} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEdit(item);
+                          }}
+                          className="p-2 text-neutral-400 hover:text-amber-400 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
+                          title="Editar Peça"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Tem a certeza que deseja eliminar "${item.name}"?`)) {
+                              if (item.id === config.featuredProductId) {
+                                handleRemoveFeaturedProduct();
+                              }
+                              onDeleteProduct(item.id);
+                            }
+                          }}
+                          className="p-2 text-neutral-400 hover:text-red-400 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
+                          title="Eliminar Peça"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -757,6 +1015,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
                       />
                     </div>
+                  </div>
+
+                  {/* Featured Product Checkbox Option */}
+                  <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-md ${formIsFeatured ? 'bg-amber-400/20 text-amber-400' : 'bg-neutral-900 text-neutral-500'}`}>
+                        <Star className={`w-4 h-4 ${formIsFeatured ? 'fill-amber-400' : ''}`} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white">Produto em Destaque Principal</p>
+                        <p className="text-[11px] text-neutral-400">Exibir esta peça no banner Hero do topo da loja</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id="form-is-featured-toggle"
+                      checked={formIsFeatured}
+                      onChange={(e) => setFormIsFeatured(e.target.checked)}
+                      className="w-4 h-4 accent-amber-400 rounded cursor-pointer"
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -999,6 +1277,306 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {/* TAB: PRODUTO EM DESTAQUE */}
+          {activeTab === 'featured' && (
+            <div className="space-y-6 max-w-4xl mx-auto">
+              {/* Header Title */}
+              <div className="pb-3 border-b border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                    <h3 className="text-base font-black text-white font-['Cabinet_Grotesk',sans-serif]">
+                      Produto em Destaque no Topo da Loja
+                    </h3>
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Escolha qual peça aparece em evidência principal no banner Hero do topo do site, visível para todos os clientes em qualquer computador ou telemóvel.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Ver na Loja</span>
+                </button>
+              </div>
+
+              {/* Feedback toast banner if triggered */}
+              {featuredFeedback && (
+                <div className="p-3.5 rounded-xl bg-amber-400/15 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center justify-between animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>{featuredFeedback}</span>
+                  </div>
+                  <button
+                    onClick={() => setFeaturedFeedback(null)}
+                    className="text-neutral-400 hover:text-white text-xs px-2"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              )}
+
+              {/* SECTION 1: PRODUTO ATUALMENTE EM DESTAQUE */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    Peça Atualmente em Destaque
+                  </h4>
+                  {currentFeaturedProduct && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveFeaturedProduct}
+                      className="text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1 transition"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remover Destaque
+                    </button>
+                  )}
+                </div>
+
+                {currentFeaturedProduct ? (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900/90 border border-amber-400/40 shadow-xl shadow-amber-400/5 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+
+                    <div className="flex flex-col md:flex-row gap-5 items-start md:items-center">
+                      {/* Product Image */}
+                      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-neutral-950 border border-neutral-800 shrink-0">
+                        <img
+                          src={currentFeaturedProduct.image}
+                          alt={currentFeaturedProduct.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-1.5 left-1.5">
+                          <span className="px-2 py-0.5 rounded bg-amber-400 text-neutral-950 text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
+                            <Star className="w-2.5 h-2.5 fill-neutral-950" />
+                            Ativo
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Product Details */}
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded bg-neutral-800 text-amber-400 border border-neutral-700">
+                            {currentFeaturedProduct.category === 'tshirts' ? 'T-Shirt' : currentFeaturedProduct.category === 'chapeus' ? 'Chapéu/Boné' : 'Moletom'}
+                          </span>
+                          {currentFeaturedProduct.badge && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                              {currentFeaturedProduct.badge}
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="text-lg font-black text-white truncate">
+                          {currentFeaturedProduct.name}
+                        </h3>
+
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-base font-black text-amber-400">
+                            {formatPrice(currentFeaturedProduct.price, config)}
+                          </span>
+                          {currentFeaturedProduct.originalPrice && (
+                            <span className="text-xs text-neutral-500 line-through">
+                              {formatPrice(currentFeaturedProduct.originalPrice, config)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Colors & Sizes summary */}
+                        <div className="flex items-center gap-4 text-xs text-neutral-400 pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-neutral-500">Cores:</span>
+                            <div className="flex -space-x-1">
+                              {currentFeaturedProduct.colors.map((c, i) => (
+                                <span
+                                  key={i}
+                                  className="w-3.5 h-3.5 rounded-full border border-black inline-block"
+                                  style={{ backgroundColor: c.hex }}
+                                  title={c.name}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-neutral-700">•</span>
+                          <div>
+                            <span className="text-[11px] text-neutral-500">Tamanhos:</span>{' '}
+                            <span className="text-neutral-300">{currentFeaturedProduct.sizes.join(', ')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Edit Tag Form */}
+                      <div className="w-full md:w-64 bg-neutral-950/80 p-3 rounded-xl border border-neutral-800 space-y-2 shrink-0">
+                        <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">
+                          Texto da Etiqueta:
+                        </label>
+                        <form onSubmit={handleSaveFeaturedSubtitle} className="space-y-2">
+                          <input
+                            type="text"
+                            placeholder="Ex: Destaque da Coleção..."
+                            value={featuredSubtitleInput}
+                            onChange={(e) => setFeaturedSubtitleInput(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <button
+                            type="submit"
+                            className="w-full py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 text-xs font-bold transition flex items-center justify-center gap-1 border border-neutral-700"
+                          >
+                            <Save className="w-3 h-3" />
+                            Guardar Etiqueta
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 rounded-2xl bg-neutral-900/40 border border-dashed border-neutral-700 text-center space-y-2">
+                    <Star className="w-8 h-8 text-neutral-500 mx-auto" />
+                    <p className="text-sm font-bold text-neutral-300">
+                      Nenhum produto está atualmente definido em destaque.
+                    </p>
+                    <p className="text-xs text-neutral-500 max-w-md mx-auto">
+                      Selecione qualquer produto no catálogo abaixo para torná-lo o item principal na página inicial da loja.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: SELETOR DE PRODUTOS */}
+              <div className="space-y-4 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                      Escolher Novo Produto para o Destaque
+                    </h4>
+                    <p className="text-[11px] text-neutral-500">
+                      Clica em "Colocar em Destaque" no produto que desejas promover.
+                    </p>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar produto..."
+                      value={featuredSearchQuery}
+                      onChange={(e) => setFeaturedSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Category Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                  {[
+                    { id: 'todos', label: 'Todos os Artigos' },
+                    { id: 'tshirts', label: 'T-Shirts' },
+                    { id: 'chapeus', label: 'Chapéus / Bonés' },
+                    { id: 'hoodies', label: 'Moletom / Hoodies' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setFeaturedCategoryFilter(cat.id as any)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                        featuredCategoryFilter === cat.id
+                          ? 'bg-amber-400 text-neutral-950 shadow-sm'
+                          : 'bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Products Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 max-h-[460px] overflow-y-auto pr-1">
+                  {filteredFeaturedProducts.map((p) => {
+                    const isSelected = p.id === currentFeaturedProduct?.id;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`p-3 rounded-xl border transition-all duration-200 flex flex-col justify-between space-y-3 ${
+                          isSelected
+                            ? 'bg-amber-950/20 border-amber-400/60 ring-1 ring-amber-400/40 shadow-lg shadow-amber-400/5'
+                            : 'bg-neutral-900/70 border-neutral-800 hover:border-neutral-700'
+                        }`}
+                      >
+                        <div className="flex gap-3 items-start">
+                          <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-neutral-950 border border-neutral-800 shrink-0">
+                            <img
+                              src={p.image}
+                              alt={p.name}
+                              className="w-full h-full object-cover"
+                            />
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
+                                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[9px] uppercase font-extrabold px-1 py-0.5 rounded bg-neutral-800 text-amber-400">
+                                {p.category === 'tshirts' ? 'T-Shirt' : p.category === 'chapeus' ? 'Chapéu' : 'Moletom'}
+                              </span>
+                              {p.badge && (
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-400/15 text-amber-300">
+                                  {p.badge}
+                                </span>
+                              )}
+                            </div>
+                            <h5 className="text-xs font-bold text-white truncate mt-1" title={p.name}>
+                              {p.name}
+                            </h5>
+                            <p className="text-xs font-black text-amber-400 mt-0.5">
+                              {formatPrice(p.price, config)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Button Action */}
+                        <div>
+                          {isSelected ? (
+                            <button
+                              type="button"
+                              onClick={handleRemoveFeaturedProduct}
+                              className="w-full py-1.5 rounded-lg bg-amber-400/20 hover:bg-red-950/50 text-amber-400 hover:text-red-400 border border-amber-400/40 hover:border-red-500/40 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                            >
+                              <Check className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Destaque Ativo (Remover)</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectFeaturedProduct(p.id)}
+                              className="w-full py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black text-xs transition flex items-center justify-center gap-1.5 shadow-sm shadow-amber-400/20 active:scale-[0.98]"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-neutral-950" />
+                              <span>Colocar em Destaque</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {filteredFeaturedProducts.length === 0 && (
+                  <div className="p-8 text-center text-neutral-500 bg-neutral-950/40 rounded-xl border border-neutral-800">
+                    Nenhum produto encontrado para a pesquisa informada.
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {/* TAB 3: WHATSAPP & STORE SETTINGS */}
@@ -1278,6 +1856,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   </button>
 
                   <button
+                    onClick={handleExportInitialProductsTS}
+                    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-2 border border-amber-400/40 transition"
+                    title="Baixa o arquivo src/data/initialProducts.ts atualizado para você substituir diretamente no seu repositório do GitHub"
+                  >
+                    <Download className="w-4 h-4 text-amber-400" />
+                    Baixar Código Fonte (initialProducts.ts)
+                  </button>
+
+                  <button
                     onClick={handleCopyJSONOnly}
                     className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-2 border border-neutral-700 transition"
                   >
@@ -1295,6 +1882,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       <Check className="w-3.5 h-3.5" /> Configurações baixadas!
                     </span>
                   )}
+                  {initialProductsExportSuccess && (
+                    <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> initialProducts.ts baixado com sucesso!
+                    </span>
+                  )}
+                </div>
+
+                {/* Dica para Repositório do GitHub */}
+                <div className="mt-3 p-3 rounded-lg bg-neutral-900/90 border border-neutral-800 text-[11px] text-neutral-300 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                    <Check className="w-3.5 h-3.5" />
+                    Como o GitHub atualiza todos os outros aparelhos:
+                  </div>
+                  <p className="text-neutral-400 leading-relaxed">
+                    Quando você edita qualquer produto neste painel, o sistema salva automaticamente no servidor e atualiza os arquivos internos. Ao subir para o seu GitHub (via git push ou upload), o seu repositório passa a ter esses dados gravados.
+                    Qualquer telemóvel ou outro dispositivo que acessar a página do GitHub detectará a nova versão e carregará os produtos atualizados instantaneamente!
+                  </p>
                 </div>
               </div>
 

@@ -6,6 +6,29 @@ import { createServer as createViteServer } from "vite";
 const catalogFilePath = path.join(process.cwd(), "public", "catalog.json");
 const configFilePath = path.join(process.cwd(), "public", "config.json");
 const versionFilePath = path.join(process.cwd(), "public", "version.json");
+const initialProductsFilePath = path.join(process.cwd(), "src", "data", "initialProducts.ts");
+
+function syncSourceCodeFiles(productsList?: any[], configObj?: any) {
+  try {
+    let currentConfig = configObj;
+    if (!currentConfig && fs.existsSync(configFilePath)) {
+      currentConfig = JSON.parse(fs.readFileSync(configFilePath, "utf-8"));
+    }
+    let currentProducts = productsList;
+    if (!currentProducts && fs.existsSync(catalogFilePath)) {
+      currentProducts = JSON.parse(fs.readFileSync(catalogFilePath, "utf-8"));
+    }
+    if (currentProducts && currentConfig) {
+      const content = `import { Product, StoreConfig } from "../types";\n\n` +
+        `export const DEFAULT_STORE_CONFIG: StoreConfig = ${JSON.stringify(currentConfig, null, 2)};\n\n` +
+        `export const INITIAL_PRODUCTS: Product[] = ${JSON.stringify(currentProducts, null, 2)};\n`;
+      fs.writeFileSync(initialProductsFilePath, content, "utf-8");
+      console.log(`[SourceSync] src/data/initialProducts.ts synchronized (${currentProducts.length} items)`);
+    }
+  } catch (e) {
+    console.warn("Could not sync src/data/initialProducts.ts:", e);
+  }
+}
 
 // Persistent version loading
 function loadPersistedVersion(): number {
@@ -170,6 +193,9 @@ async function startServer() {
       // Save to public/catalog.json
       fs.writeFileSync(catalogFilePath, JSON.stringify(productsList, null, 2), "utf-8");
 
+      // Synchronize src/data/initialProducts.ts so GitHub code repository updates as well
+      syncSourceCodeFiles(productsList, undefined);
+
       // In production mode, also save to dist/catalog.json if dist exists
       const distCatalogPath = path.join(process.cwd(), "dist", "catalog.json");
       if (fs.existsSync(path.join(process.cwd(), "dist"))) {
@@ -222,6 +248,9 @@ async function startServer() {
       }
 
       fs.writeFileSync(configFilePath, JSON.stringify(newConfig, null, 2), "utf-8");
+
+      // Synchronize src/data/initialProducts.ts so GitHub code repository updates as well
+      syncSourceCodeFiles(undefined, newConfig);
 
       // In production mode, also write to dist/config.json
       const distConfigPath = path.join(process.cwd(), "dist", "config.json");
