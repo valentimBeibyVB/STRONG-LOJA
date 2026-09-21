@@ -4,12 +4,17 @@ export interface ProductColor {
   image?: string; // Optional color-specific image
 }
 
-export type ProductCategory = 'tshirts' | 'chapeus' | 'hoodies' | 'todos';
+export interface CategoryItem {
+  id: string; // unique slug e.g. "tshirts", "chapeus", "hoodies", "calcas"
+  name: string; // display title e.g. "T-shirts & Oversized"
+}
+
+export type ProductCategory = 'todos' | string;
 
 export interface Product {
   id: string;
   name: string;
-  category: 'tshirts' | 'chapeus' | 'hoodies';
+  category: string;
   price: number;
   originalPrice?: number;
   description: string;
@@ -48,6 +53,7 @@ export interface StoreConfig {
   adminPassword?: string;
   featuredProductId?: string; // ID do produto em destaque principal
   featuredSubtitle?: string; // Título/badge customizado do destaque (ex: "Destaque da Coleção")
+  categories?: CategoryItem[];
 }
 
 export interface CheckoutCustomerInfo {

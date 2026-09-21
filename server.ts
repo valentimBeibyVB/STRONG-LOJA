@@ -19,7 +19,13 @@ function syncSourceCodeFiles(productsList?: any[], configObj?: any) {
       currentProducts = JSON.parse(fs.readFileSync(catalogFilePath, "utf-8"));
     }
     if (currentProducts && currentConfig) {
-      const content = `import { Product, StoreConfig } from "../types";\n\n` +
+      const defaultCats = currentConfig.categories || [
+        { id: "tshirts", name: "T-shirts & Oversized" },
+        { id: "chapeus", name: "Chapéus & Bonés" },
+        { id: "hoodies", name: "Moletom & Hoodies" }
+      ];
+      const content = `import { Product, StoreConfig, CategoryItem } from "../types";\n\n` +
+        `export const DEFAULT_CATEGORIES: CategoryItem[] = ${JSON.stringify(defaultCats, null, 2)};\n\n` +
         `export const DEFAULT_STORE_CONFIG: StoreConfig = ${JSON.stringify(currentConfig, null, 2)};\n\n` +
         `export const INITIAL_PRODUCTS: Product[] = ${JSON.stringify(currentProducts, null, 2)};\n`;
       fs.writeFileSync(initialProductsFilePath, content, "utf-8");

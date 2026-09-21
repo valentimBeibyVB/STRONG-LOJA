@@ -101,7 +101,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Category Pill */}
         <div className="absolute top-3 right-3 z-10">
           <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-neutral-950/80 backdrop-blur-md text-neutral-300 border border-neutral-700/50">
-            {product.category === 'tshirts' ? 'T-Shirt' : product.category === 'chapeus' ? 'Chapéu/Boné' : 'Moletom'}
+            {config.categories?.find((c) => c.id === product.category)?.name || product.category}
           </span>
         </div>
 
@@ -164,17 +164,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       e.stopPropagation();
                       setSelectedColor(color);
                     }}
-                    title={`Cor: ${color.name}`}
+                    title={`Cor: ${color.name}${color.image ? ' (com foto exclusiva)' : ''}`}
                     className={`relative w-6 h-6 rounded-full border-2 transition-all p-0.5 ${
                       isSelected
                         ? 'border-amber-400 scale-110 shadow-sm shadow-amber-400/30'
                         : 'border-neutral-700 hover:border-neutral-500'
                     }`}
                   >
-                    <span
-                      className="block w-full h-full rounded-full border border-black/20"
-                      style={{ backgroundColor: color.hex }}
-                    />
+                    {color.image ? (
+                      <img
+                        src={color.image}
+                        alt={color.name}
+                        className="block w-full h-full rounded-full object-cover border border-black/20"
+                      />
+                    ) : (
+                      <span
+                        className="block w-full h-full rounded-full border border-black/20"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                    )}
                   </button>
                 );
               })}

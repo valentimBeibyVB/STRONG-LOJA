@@ -111,7 +111,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div>
               {/* Category & Title */}
               <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
-                {product.category === 'tshirts' ? 'T-shirt Strong' : product.category === 'chapeus' ? 'Chapéu & Boné Strong' : 'Vestuário Strong'}
+                {config.categories?.find((c) => c.id === product.category)?.name || product.category}
               </span>
               <h2 className="text-2xl font-black text-white mt-1 font-['Cabinet_Grotesk',sans-serif]">
                 {product.name}
@@ -172,10 +172,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
                         }`}
                       >
-                        <span
-                          className="w-4 h-4 rounded-full border border-black/30 inline-block shrink-0"
-                          style={{ backgroundColor: color.hex }}
-                        />
+                        {color.image ? (
+                          <img
+                            src={color.image}
+                            alt={color.name}
+                            className="w-4 h-4 rounded-full object-cover border border-black/30 inline-block shrink-0"
+                          />
+                        ) : (
+                          <span
+                            className="w-4 h-4 rounded-full border border-black/30 inline-block shrink-0"
+                            style={{ backgroundColor: color.hex }}
+                          />
+                        )}
                         <span>{color.name}</span>
                       </button>
                     );

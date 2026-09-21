@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { MessageCircle, ShoppingBag, Sparkles, Filter, AlertCircle, ArrowUp } from 'lucide-react';
+import { MessageCircle, ShoppingBag, Sparkles, Filter, AlertCircle, ArrowUp, Plus } from 'lucide-react';
 import { Product, ProductColor, CartItem, StoreConfig, ProductCategory, SyncLogEntry } from './types';
 import { INITIAL_PRODUCTS, DEFAULT_STORE_CONFIG } from './data/initialProducts';
 import { Header } from './components/Header';
@@ -19,6 +19,12 @@ export default function App() {
   // 1. Storage & Persistence (Client-side localStorage suitable for GitHub Pages / static hosting)
   const [products, setProducts] = useState<Product[]>(() => {
     try {
+      const isCleaned = localStorage.getItem('strong_catalog_zero_v3');
+      if (!isCleaned) {
+        localStorage.removeItem('strong_products');
+        localStorage.setItem('strong_catalog_zero_v3', 'true');
+        return [];
+      }
       const saved = localStorage.getItem('strong_products');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -294,7 +300,7 @@ export default function App() {
       });
       if (apiRes.ok) {
         const json = await apiRes.json();
-        if (Array.isArray(json.products) && json.products.length > 0) {
+        if (Array.isArray(json.products)) {
           setIsServerSyncActive(true);
           syncedFromServer = true;
           const serverVer = typeof json.version === 'number' ? json.version : 0;
@@ -375,7 +381,7 @@ export default function App() {
           ? staticData.products
           : null;
 
-        if (catalogProducts && catalogProducts.length > 0 && (!isSavingRef.current || force)) {
+        if (catalogProducts !== null && (!isSavingRef.current || force)) {
           setProducts((currentProducts) => {
             const isDifferent = JSON.stringify(currentProducts) !== JSON.stringify(catalogProducts);
             if (force || isDifferent) {
@@ -655,9 +661,45 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 3. Filtered Products
+  // 3. Unified & Filtered Products
+  // Automatically group products with identical names so colors and photos are unified in a single card
+  const unifiedProducts = useMemo(() => {
+    const map = new Map<string, Product>();
+    for (const item of products) {
+      const key = item.name.trim().toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { ...item, colors: [...item.colors], sizes: [...item.sizes] });
+      } else {
+        const existing = map.get(key)!;
+        // Merge colors without duplicating exact name
+        for (const col of item.colors) {
+          const foundIdx = existing.colors.findIndex(
+            (c) => c.name.trim().toLowerCase() === col.name.trim().toLowerCase()
+          );
+          if (foundIdx > -1) {
+            if (col.image && !existing.colors[foundIdx].image) {
+              existing.colors[foundIdx] = { ...existing.colors[foundIdx], image: col.image };
+            }
+          } else {
+            existing.colors.push(col);
+          }
+        }
+        // Merge sizes
+        for (const sz of item.sizes) {
+          if (!existing.sizes.includes(sz)) {
+            existing.sizes.push(sz);
+          }
+        }
+        if (!existing.badge && item.badge) {
+          existing.badge = item.badge;
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
-    return products.filter((item) => {
+    return unifiedProducts.filter((item) => {
       // Category match
       const matchesCategory =
         selectedCategory === 'todos' || item.category === selectedCategory;
@@ -673,20 +715,20 @@ export default function App() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [unifiedProducts, selectedCategory, searchQuery]);
 
   // Featured Product calculation (selected in Admin via config.featuredProductId or product.isFeatured)
   const featuredProduct = useMemo(() => {
     if (config.featuredProductId) {
-      const found = products.find((p) => p.id === config.featuredProductId);
+      const found = unifiedProducts.find((p) => p.id === config.featuredProductId);
       if (found) return found;
     }
-    const byProp = products.find((p) => p.isFeatured);
+    const byProp = unifiedProducts.find((p) => p.isFeatured);
     if (byProp) return byProp;
-    const byBadge = products.find((p) => p.badge?.toLowerCase().includes('destaque'));
+    const byBadge = unifiedProducts.find((p) => p.badge?.toLowerCase().includes('destaque'));
     if (byBadge) return byBadge;
-    return products[0] || null;
-  }, [products, config.featuredProductId]);
+    return unifiedProducts[0] || null;
+  }, [unifiedProducts, config.featuredProductId]);
 
   // 4. Cart Handlers
   const handleAddToCart = (
@@ -741,17 +783,78 @@ export default function App() {
   // 5. Admin Handlers
   const handleSaveProduct = (newOrEditedProduct: Product) => {
     const prev = products;
-    const index = prev.findIndex((p) => p.id === newOrEditedProduct.id);
+    const cleanName = newOrEditedProduct.name.trim().toLowerCase();
+
+    // Check if another product with identical name exists (auto-grouping requirement)
+    const existingSameNameIndex = prev.findIndex(
+      (p) => p.id !== newOrEditedProduct.id && p.name.trim().toLowerCase() === cleanName
+    );
+
     let updated: Product[];
-    const isEdit = index > -1;
-    if (isEdit) {
-      updated = [...prev];
-      updated[index] = newOrEditedProduct;
+    let op = '';
+
+    if (existingSameNameIndex > -1) {
+      const existing = prev[existingSameNameIndex];
+      // Merge colors
+      const mergedColors = [...existing.colors];
+      for (const newColor of newOrEditedProduct.colors) {
+        const foundColorIdx = mergedColors.findIndex(
+          (c) => c.name.trim().toLowerCase() === newColor.name.trim().toLowerCase()
+        );
+        if (foundColorIdx > -1) {
+          mergedColors[foundColorIdx] = {
+            ...mergedColors[foundColorIdx],
+            hex: newColor.hex || mergedColors[foundColorIdx].hex,
+            image: newColor.image || mergedColors[foundColorIdx].image,
+          };
+        } else {
+          mergedColors.push(newColor);
+        }
+      }
+
+      // Merge sizes
+      const mergedSizes = Array.from(new Set([...existing.sizes, ...newOrEditedProduct.sizes]));
+
+      const mergedProduct: Product = {
+        ...existing,
+        price: newOrEditedProduct.price || existing.price,
+        originalPrice: newOrEditedProduct.originalPrice ?? existing.originalPrice,
+        category: newOrEditedProduct.category || existing.category,
+        description: newOrEditedProduct.description || existing.description,
+        image: existing.image || newOrEditedProduct.image,
+        colors: mergedColors,
+        sizes: mergedSizes,
+        badge: newOrEditedProduct.badge || existing.badge,
+        inStock: existing.inStock || newOrEditedProduct.inStock,
+      };
+
+      const currentIndex = prev.findIndex((p) => p.id === newOrEditedProduct.id);
+      if (currentIndex > -1 && currentIndex !== existingSameNameIndex) {
+        updated = prev.filter((p) => p.id !== newOrEditedProduct.id);
+        const newTargetIndex = updated.findIndex((p) => p.id === existing.id);
+        updated[newTargetIndex] = mergedProduct;
+      } else {
+        updated = [...prev];
+        updated[existingSameNameIndex] = mergedProduct;
+      }
+
+      op = `Agrupar cor no produto "${mergedProduct.name}"`;
+      setSyncToast(`Produto "${mergedProduct.name}" atualizado! Cores e fotos unificadas.`);
+      setTimeout(() => setSyncToast(null), 4000);
     } else {
-      updated = [newOrEditedProduct, ...prev];
+      const index = prev.findIndex((p) => p.id === newOrEditedProduct.id);
+      const isEdit = index > -1;
+      if (isEdit) {
+        updated = [...prev];
+        updated[index] = newOrEditedProduct;
+        op = `Editar produto "${newOrEditedProduct.name}"`;
+      } else {
+        updated = [newOrEditedProduct, ...prev];
+        op = `Criar produto "${newOrEditedProduct.name}"`;
+      }
     }
+
     setProducts(updated);
-    const op = isEdit ? `Editar produto "${newOrEditedProduct.name}"` : `Criar produto "${newOrEditedProduct.name}"`;
     addSyncLog('save_products', op, 'success', 'local_storage', {
       details: `${newOrEditedProduct.name} - ${newOrEditedProduct.price.toLocaleString('pt-AO')} Kz`,
       itemCount: updated.length,
@@ -771,17 +874,34 @@ export default function App() {
     persistProducts(updated, op);
   };
 
-  const handleResetToDefaults = () => {
-    setProducts(INITIAL_PRODUCTS);
-    localStorage.removeItem('strong_products');
-    localStorage.removeItem('strong_has_local_edits');
-    localStorage.removeItem('strong_catalog_version');
-    localCatalogVersionRef.current = 0;
-    addSyncLog('reset_defaults', 'Restaurar Catálogo Padrão', 'warning', 'local_storage', {
-      details: `Catálogo redefinido para a lista inicial de fábrica (${INITIAL_PRODUCTS.length} itens).`,
-      itemCount: INITIAL_PRODUCTS.length,
+  const handleClearAllProducts = () => {
+    setProducts([]);
+    try {
+      localStorage.removeItem('strong_products');
+      localStorage.setItem('strong_catalog_version', Date.now().toString());
+    } catch {}
+    localCatalogVersionRef.current = Date.now();
+    addSyncLog('reset_defaults', 'Limpar Todo o Catálogo', 'warning', 'local_storage', {
+      details: 'Catálogo completamente limpo a pedido do administrador (0 artigos).',
+      itemCount: 0,
     });
-    persistProducts(INITIAL_PRODUCTS, 'Restaurar catálogo padrão');
+    persistProducts([], 'Limpar todo o catálogo');
+    setSyncToast('Catálogo limpo com sucesso! 0 produtos no site.');
+    setTimeout(() => setSyncToast(null), 4000);
+  };
+
+  const handleResetToDefaults = () => {
+    setProducts([]);
+    try {
+      localStorage.removeItem('strong_products');
+      localStorage.removeItem('strong_has_local_edits');
+    } catch {}
+    localCatalogVersionRef.current = Date.now();
+    addSyncLog('reset_defaults', 'Catálogo Limpo / Vazio', 'warning', 'local_storage', {
+      details: 'Catálogo limpo para início de cadastros manuais.',
+      itemCount: 0,
+    });
+    persistProducts([], 'Catálogo limpo');
   };
 
   const handleUpdateConfig = (newConfig: StoreConfig) => {
@@ -838,10 +958,9 @@ export default function App() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl sm:text-3xl font-black text-white font-['Cabinet_Grotesk',sans-serif]">
-                {selectedCategory === 'todos' && 'Coleção Completa'}
-                {selectedCategory === 'tshirts' && 'T-shirts & Oversized'}
-                {selectedCategory === 'chapeus' && 'Chapéus, Bucket Hats & Bonés'}
-                {selectedCategory === 'hoodies' && 'Moletom & Hoodies'}
+                {selectedCategory === 'todos'
+                  ? 'Coleção Completa'
+                  : config.categories?.find((c) => c.id === selectedCategory)?.name || selectedCategory}
               </h2>
               <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-bold text-amber-400">
                 {filteredProducts.length} {filteredProducts.length === 1 ? 'item' : 'itens'}
@@ -869,7 +988,28 @@ export default function App() {
         </div>
 
         {/* Product Cards Grid */}
-        {filteredProducts.length === 0 ? (
+        {products.length === 0 ? (
+          <div className="py-20 text-center flex flex-col items-center justify-center space-y-4 rounded-2xl bg-neutral-900/40 border border-neutral-800/80 p-8 max-w-xl mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-inner">
+              <ShoppingBag className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-black text-white font-['Cabinet_Grotesk',sans-serif]">
+              Catálogo Limpo & Pronto para Cadastros
+            </h3>
+            <p className="text-xs text-neutral-400 leading-relaxed max-w-md">
+              Todos os produtos antigos foram limpos com sucesso. Podes agora começar a cadastrar as tuas novas peças, cores com fotos exclusivas e categorias personalizadas no Painel Administrativo.
+            </p>
+            <div className="pt-2">
+              <button
+                onClick={() => setIsAdminOpen(true)}
+                className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-400/20 transition transform active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Abrir Painel & Cadastrar Primeiro Produto</span>
+              </button>
+            </div>
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="py-20 text-center flex flex-col items-center justify-center space-y-4 rounded-2xl bg-neutral-900/40 border border-neutral-800/80 p-8">
             <div className="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-500">
               <Filter className="w-6 h-6" />
@@ -961,6 +1101,7 @@ export default function App() {
         onSaveProduct={handleSaveProduct}
         onDeleteProduct={handleDeleteProduct}
         onResetToDefaults={handleResetToDefaults}
+        onClearAllProducts={handleClearAllProducts}
         config={config}
         onUpdateConfig={handleUpdateConfig}
         onImportProducts={handleImportProducts}

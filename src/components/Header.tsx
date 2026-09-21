@@ -118,41 +118,27 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Todos os Produtos
           </button>
-          <button
-            id="cat-tab-tshirts"
-            onClick={() => onSelectCategory('tshirts')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${
-              selectedCategory === 'tshirts'
-                ? 'bg-amber-400 text-neutral-950 shadow-sm'
-                : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
-            }`}
-          >
-            <Shirt className="w-3.5 h-3.5" />
-            T-shirts & Oversized
-          </button>
-          <button
-            id="cat-tab-chapeus"
-            onClick={() => onSelectCategory('chapeus')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${
-              selectedCategory === 'chapeus'
-                ? 'bg-amber-400 text-neutral-950 shadow-sm'
-                : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Chapéus, Bucket & Bonés
-          </button>
-          <button
-            id="cat-tab-hoodies"
-            onClick={() => onSelectCategory('hoodies')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${
-              selectedCategory === 'hoodies'
-                ? 'bg-amber-400 text-neutral-950 shadow-sm'
-                : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
-            }`}
-          >
-            Hoodies & Casacos
-          </button>
+          {(config.categories && config.categories.length > 0
+            ? config.categories
+            : [
+                { id: 'tshirts', name: 'T-shirts & Oversized' },
+                { id: 'chapeus', name: 'Chapéus & Bonés' },
+                { id: 'hoodies', name: 'Moletom & Hoodies' },
+              ]
+          ).map((cat) => (
+            <button
+              key={cat.id}
+              id={`cat-tab-${cat.id}`}
+              onClick={() => onSelectCategory(cat.id)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${
+                selectedCategory === cat.id
+                  ? 'bg-amber-400 text-neutral-950 shadow-sm'
+                  : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
         </div>
 
         {/* Mobile Search Input */}

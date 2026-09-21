@@ -30,6 +30,8 @@ import {
   Star,
   Search,
   Sparkles,
+  Layers,
+  Tag,
 } from 'lucide-react';
 import { Product, ProductColor, StoreConfig, SyncLogEntry } from '../types';
 import { formatPrice } from '../utils/whatsapp';
@@ -42,6 +44,7 @@ interface AdminModalProps {
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
   onResetToDefaults: () => void;
+  onClearAllProducts?: () => void;
   config: StoreConfig;
   onUpdateConfig: (newConfig: StoreConfig) => void;
   onImportProducts: (products: Product[]) => void;
@@ -59,6 +62,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onSaveProduct,
   onDeleteProduct,
   onResetToDefaults,
+  onClearAllProducts,
   config,
   onUpdateConfig,
   onImportProducts,
@@ -81,12 +85,32 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [showCode, setShowCode] = useState(false);
   const [showAdminPasswordInSettings, setShowAdminPasswordInSettings] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'featured' | 'settings' | 'github' | 'logs'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'featured' | 'categories' | 'settings' | 'github' | 'logs'>('products');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+
+  // Categories list
+  const currentCategories = useMemo(() => {
+    return config.categories && config.categories.length > 0
+      ? config.categories
+      : [
+          { id: 'tshirts', name: 'T-shirts & Oversized' },
+          { id: 'chapeus', name: 'Chapéus & Bonés' },
+          { id: 'hoodies', name: 'Moletom & Hoodies' },
+        ];
+  }, [config.categories]);
+
+  // Category management state
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatId, setNewCatId] = useState('');
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState('');
+  const [catActionFeedback, setCatActionFeedback] = useState<string | null>(null);
+  const [showQuickNewCatModal, setShowQuickNewCatModal] = useState(false);
+  const [quickCatName, setQuickCatName] = useState('');
 
   // Form State for creating / editing product
   const [formName, setFormName] = useState('');
-  const [formCategory, setFormCategory] = useState<'tshirts' | 'chapeus' | 'hoodies'>('tshirts');
+  const [formCategory, setFormCategory] = useState<string>('tshirts');
   const [formPrice, setFormPrice] = useState<number>(15000);
   const [formOriginalPrice, setFormOriginalPrice] = useState<number | undefined>(undefined);
   const [formDescription, setFormDescription] = useState('');
@@ -97,13 +121,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   // Featured Product Area State
   const [featuredSearchQuery, setFeaturedSearchQuery] = useState('');
-  const [featuredCategoryFilter, setFeaturedCategoryFilter] = useState<'todos' | 'tshirts' | 'chapeus' | 'hoodies'>('todos');
+  const [featuredCategoryFilter, setFeaturedCategoryFilter] = useState<string>('todos');
   const [featuredSubtitleInput, setFeaturedSubtitleInput] = useState(config.featuredSubtitle || 'Destaque da Coleção');
   const [featuredFeedback, setFeaturedFeedback] = useState<string | null>(null);
 
   // Products Tab Search & Filter State
   const [adminProductSearchQuery, setAdminProductSearchQuery] = useState('');
-  const [adminProductCategoryFilter, setAdminProductCategoryFilter] = useState<'todos' | 'tshirts' | 'chapeus' | 'hoodies'>('todos');
+  const [adminProductCategoryFilter, setAdminProductCategoryFilter] = useState<string>('todos');
 
   // Colors list for the current product
   const [formColors, setFormColors] = useState<ProductColor[]>([
@@ -112,6 +136,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   ]);
   const [newColorName, setNewColorName] = useState('');
   const [newColorHex, setNewColorHex] = useState('#000000');
+  const [newColorImage, setNewColorImage] = useState<string>('');
+  const [targetColorIndexForUpload, setTargetColorIndexForUpload] = useState<number | null>(null);
+
+  const colorFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sizes list
   const [formSizes, setFormSizes] = useState<string[]>(['S', 'M', 'L', 'XL']);
@@ -174,6 +202,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return matchCat && matchQuery;
     });
   }, [products, adminProductCategoryFilter, adminProductSearchQuery]);
+
+  // Check if there is an existing product with same name (automatic grouping indicator)
+  const sameNameMatch = useMemo(() => {
+    if (!formName.trim()) return null;
+    return products.find(
+      (p) => p.id !== editingProductId && p.name.trim().toLowerCase() === formName.trim().toLowerCase()
+    );
+  }, [formName, editingProductId, products]);
 
   // Handlers for Featured Products
   const handleSelectFeaturedProduct = (productId: string) => {
@@ -259,11 +295,123 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setActiveTab('new');
   };
 
+  // Category Management Handlers
+  const handleCreateCategory = (name: string, customId?: string) => {
+    if (!name.trim()) return '';
+    const cleanId = (customId || name)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    if (!cleanId) return '';
+
+    if (currentCategories.some((c) => c.id === cleanId)) {
+      setCatActionFeedback('Já existe uma categoria com este identificador.');
+      setTimeout(() => setCatActionFeedback(null), 3500);
+      return cleanId;
+    }
+
+    const updatedCategories = [...currentCategories, { id: cleanId, name: name.trim() }];
+    onUpdateConfig({
+      ...config,
+      categories: updatedCategories,
+    });
+
+    setCatActionFeedback(`Categoria "${name.trim()}" criada com sucesso!`);
+    setTimeout(() => setCatActionFeedback(null), 3500);
+    setNewCatName('');
+    setNewCatId('');
+    return cleanId;
+  };
+
+  const handleSaveEditCategory = (id: string) => {
+    if (!editingCatName.trim()) return;
+    const updatedCategories = currentCategories.map((c) =>
+      c.id === id ? { ...c, name: editingCatName.trim() } : c
+    );
+    onUpdateConfig({
+      ...config,
+      categories: updatedCategories,
+    });
+    setEditingCatId(null);
+    setEditingCatName('');
+    setCatActionFeedback('Categoria atualizada com sucesso!');
+    setTimeout(() => setCatActionFeedback(null), 3500);
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    const target = currentCategories.find((c) => c.id === id);
+    if (!target) return;
+    if (
+      window.confirm(
+        `Tens a certeza de que desejas eliminar a categoria "${target.name}"? Os produtos cadastrados continuarão preservados.`
+      )
+    ) {
+      const updatedCategories = currentCategories.filter((c) => c.id !== id);
+      onUpdateConfig({
+        ...config,
+        categories: updatedCategories,
+      });
+      setCatActionFeedback(`Categoria "${target.name}" eliminada.`);
+      setTimeout(() => setCatActionFeedback(null), 3500);
+    }
+  };
+
+  // Color file upload with canvas compression
+  const handleColorFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 900;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = Math.round(width);
+        canvas.height = Math.round(height);
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, Math.round(width), Math.round(height));
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        if (targetColorIndexForUpload === -1) {
+          setNewColorImage(dataUrl);
+        } else if (targetColorIndexForUpload !== null && targetColorIndexForUpload >= 0) {
+          setFormColors((prev) =>
+            prev.map((c, idx) => (idx === targetColorIndexForUpload ? { ...c, image: dataUrl } : c))
+          );
+        }
+        setTargetColorIndexForUpload(null);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   // Reset form to blank
   const handleResetForm = () => {
     setEditingProductId(null);
     setFormName('');
-    setFormCategory('tshirts');
+    setFormCategory(currentCategories[0]?.id || 'tshirts');
     setFormPrice(15000);
     setFormOriginalPrice(undefined);
     setFormDescription('');
@@ -276,6 +424,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       { name: 'Branco', hex: '#ffffff' },
     ]);
     setFormSizes(['S', 'M', 'L', 'XL']);
+    setNewColorName('');
+    setNewColorHex('#000000');
+    setNewColorImage('');
+    setShowQuickNewCatModal(false);
   };
 
   // Compress & read real image uploaded from local disk
@@ -323,8 +475,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Add Color
   const handleAddColor = () => {
     if (!newColorName.trim()) return;
-    setFormColors([...formColors, { name: newColorName.trim(), hex: newColorHex }]);
+    setFormColors([
+      ...formColors,
+      {
+        name: newColorName.trim(),
+        hex: newColorHex,
+        image: newColorImage.trim() || undefined,
+      },
+    ]);
     setNewColorName('');
+    setNewColorImage('');
   };
 
   // Remove Color
@@ -704,6 +864,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('categories')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'categories'
+              ? 'bg-amber-400 text-neutral-950 shadow-sm'
+              : 'bg-neutral-800/80 text-neutral-300 hover:bg-neutral-800'
+          }`}
+          title="Criar e editar categorias da loja"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Categorias ({currentCategories.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('settings')}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'settings'
@@ -753,16 +926,40 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     Estes são os produtos visíveis no site da Strong. Você pode editar cores, preços ou adicionar fotos reais.
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    handleResetForm();
-                    setActiveTab('new');
-                  }}
-                  className="px-3.5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-1.5 self-start shadow-sm transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  Novo Produto
-                </button>
+                <div className="flex items-center gap-2 self-start">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          'Tens a certeza de que desejas LIMPAR TODOS os produtos do catálogo? O site ficará sem produtos antigos para que possas cadastrar todos do zero.'
+                        )
+                      ) {
+                        if (onClearAllProducts) {
+                          onClearAllProducts();
+                        } else {
+                          onResetToDefaults();
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-red-950/70 hover:bg-red-900 text-red-300 border border-red-800/60 font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="Apagar todos os produtos antigos e deixar o site limpo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Limpar Catálogo (Zerar)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleResetForm();
+                      setActiveTab('new');
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Novo Produto
+                  </button>
+                </div>
               </div>
 
               {/* Search & Category Filter Bar */}
@@ -779,23 +976,29 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                  {[
-                    { id: 'todos', label: 'Todos' },
-                    { id: 'tshirts', label: 'T-Shirts' },
-                    { id: 'chapeus', label: 'Chapéus / Bonés' },
-                    { id: 'hoodies', label: 'Hoodies' },
-                  ].map((cat) => (
+                  <button
+                    type="button"
+                    onClick={() => setAdminProductCategoryFilter('todos')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition whitespace-nowrap ${
+                      adminProductCategoryFilter === 'todos'
+                        ? 'bg-amber-400 text-neutral-950 shadow-sm'
+                        : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {currentCategories.map((cat) => (
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => setAdminProductCategoryFilter(cat.id as any)}
+                      onClick={() => setAdminProductCategoryFilter(cat.id)}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition whitespace-nowrap ${
                         adminProductCategoryFilter === cat.id
                           ? 'bg-amber-400 text-neutral-950 shadow-sm'
                           : 'bg-neutral-800 text-neutral-400 hover:text-white'
                       }`}
                     >
-                      {cat.label}
+                      {cat.name}
                     </button>
                   ))}
                 </div>
@@ -849,7 +1052,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-neutral-800 text-amber-400">
-                            {item.category === 'tshirts' ? 'T-Shirt' : item.category === 'chapeus' ? 'Chapéu/Boné' : 'Moletom'}
+                            {currentCategories.find((c) => c.id === item.category)?.name || item.category}
                           </span>
                           {(item.id === config.featuredProductId || item.isFeatured) && (
                             <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-neutral-950 flex items-center gap-1 shadow-sm">
@@ -987,19 +1190,68 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     />
                   </div>
 
+                  {/* Same-name auto grouping notification */}
+                  {sameNameMatch && (
+                    <div className="p-3 bg-amber-400/10 border border-amber-400/40 rounded-xl flex items-start gap-2.5 animate-fadeIn">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-200 leading-relaxed">
+                        <span className="font-bold text-amber-400">Agrupamento Automático de Cores:</span> Já existe um produto cadastrado com o nome <strong>"{sameNameMatch.name}"</strong> ({sameNameMatch.colors.length} cor(es)). Ao salvar, as novas cores e fotos inseridas aqui serão automaticamente adicionadas ao mesmo card na vitrine!
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1">
-                        Categoria:
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                          Categoria:
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuickNewCatModal(!showQuickNewCatModal)}
+                          className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-0.5"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Nova</span>
+                        </button>
+                      </div>
+
+                      {showQuickNewCatModal && (
+                        <div className="mb-2 p-2.5 bg-neutral-900 border border-amber-400/40 rounded-xl space-y-2">
+                          <span className="text-[11px] font-bold text-amber-400 block">Criar Nova Categoria:</span>
+                          <input
+                            type="text"
+                            placeholder="Nome (ex: Calças, Acessórios...)"
+                            value={quickCatName}
+                            onChange={(e) => setQuickCatName(e.target.value)}
+                            className="w-full px-2 py-1 bg-neutral-950 border border-neutral-700 rounded text-xs text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!quickCatName.trim()) return;
+                              const createdId = handleCreateCategory(quickCatName.trim());
+                              if (createdId) setFormCategory(createdId);
+                              setQuickCatName('');
+                              setShowQuickNewCatModal(false);
+                            }}
+                            className="w-full py-1 bg-amber-400 text-neutral-950 font-bold text-xs rounded hover:bg-amber-300 transition"
+                          >
+                            Criar e Selecionar
+                          </button>
+                        </div>
+                      )}
+
                       <select
                         value={formCategory}
-                        onChange={(e) => setFormCategory(e.target.value as any)}
+                        onChange={(e) => setFormCategory(e.target.value)}
                         className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-sm text-white focus:outline-none focus:border-amber-400"
                       >
-                        <option value="tshirts">T-shirts & Oversized</option>
-                        <option value="chapeus">Chapéus, Bucket & Bonés</option>
-                        <option value="hoodies">Moletom & Hoodies</option>
+                        {currentCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -1154,59 +1406,186 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </div>
                   </div>
 
-                  {/* CORES DISPONÍVEIS (Key User Requirement) */}
+                  {/* CORES DISPONÍVEIS COM FOTOS EXCLUSIVAS */}
                   <div>
-                    <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1">
-                      Cores Disponíveis para Escolha:
-                    </label>
+                    {/* Hidden file input for color-specific photos */}
+                    <input
+                      ref={colorFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleColorFileUpload}
+                      className="hidden"
+                    />
+
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                        Cores & Fotos Específicas:
+                      </label>
+                      <span className="text-[10px] text-amber-400 font-bold">
+                        Troca de foto ao clicar na cor
+                      </span>
+                    </div>
+
                     <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
-                      {/* Current colors pill list */}
-                      <div className="flex flex-wrap gap-2">
+                      {/* Current colors list */}
+                      <div className="space-y-2">
                         {formColors.map((color, index) => (
-                          <span
+                          <div
                             key={index}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs text-white"
+                            className="p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800 flex items-center justify-between gap-2.5 hover:border-neutral-700 transition"
                           >
-                            <span
-                              className="w-3 h-3 rounded-full border border-black/40 shrink-0"
-                              style={{ backgroundColor: color.hex }}
-                            />
-                            <span>{color.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveColor(index)}
-                              className="text-neutral-500 hover:text-red-400 ml-1"
-                              title="Remover cor"
-                            >
-                              ×
-                            </button>
-                          </span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="w-5 h-5 rounded-full border border-black/40 shrink-0 shadow-inner"
+                                style={{ backgroundColor: color.hex }}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-white truncate">{color.name}</p>
+                                <p className="text-[10px] text-neutral-500 font-mono">{color.hex}</p>
+                              </div>
+                            </div>
+
+                            {/* Color Image & Actions */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {color.image ? (
+                                <div className="relative group/colorimg">
+                                  <img
+                                    src={color.image}
+                                    alt={color.name}
+                                    className="w-8 h-8 object-cover rounded-md border border-amber-400/40 bg-neutral-950"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFormColors((prev) =>
+                                        prev.map((c, i) => (i === index ? { ...c, image: undefined } : c))
+                                      );
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow"
+                                    title="Remover foto desta cor"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-neutral-500 italic hidden sm:inline">
+                                  (Foto padrão)
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTargetColorIndexForUpload(index);
+                                  colorFileInputRef.current?.click();
+                                }}
+                                className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-[11px] font-bold text-neutral-200 hover:text-white flex items-center gap-1 transition"
+                                title="Carregar foto real para esta cor"
+                              >
+                                <Upload className="w-3 h-3 text-amber-400" />
+                                <span className="hidden sm:inline">{color.image ? 'Trocar Foto' : '+ Foto'}</span>
+                                <span className="sm:hidden">Foto</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const url = window.prompt(
+                                    `Link URL da imagem para a cor "${color.name}":`,
+                                    color.image || ''
+                                  );
+                                  if (url !== null) {
+                                    setFormColors((prev) =>
+                                      prev.map((c, i) =>
+                                        i === index ? { ...c, image: url.trim() || undefined } : c
+                                      )
+                                    );
+                                  }
+                                }}
+                                className="p-1.5 text-neutral-400 hover:text-amber-400 bg-neutral-800 rounded"
+                                title="Inserir link URL da foto desta cor"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveColor(index)}
+                                className="p-1.5 text-neutral-500 hover:text-red-400 rounded"
+                                title="Remover cor"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
 
                       {/* Add new color controls */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-neutral-800/80">
-                        <input
-                          type="color"
-                          value={newColorHex}
-                          onChange={(e) => setNewColorHex(e.target.value)}
-                          className="w-8 h-8 rounded border-0 bg-transparent cursor-pointer"
-                          title="Escolher tom"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Nome da cor (ex: Bege, Preto Ônix...)"
-                          value={newColorName}
-                          onChange={(e) => setNewColorName(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddColor}
-                          className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-amber-400 transition"
-                        >
-                          + Adicionar Cor
-                        </button>
+                      <div className="p-3 bg-neutral-900/60 rounded-xl border border-neutral-800 space-y-2.5 pt-2.5">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-neutral-300">
+                          <span>Adicionar Nova Cor à Peça</span>
+                          {newColorImage && (
+                            <span className="text-emerald-400 flex items-center gap-1 text-[10px]">
+                              <Check className="w-3 h-3" /> Foto anexada
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={newColorHex}
+                            onChange={(e) => setNewColorHex(e.target.value)}
+                            className="w-8 h-8 rounded-lg border border-neutral-700 bg-neutral-950 cursor-pointer p-0.5"
+                            title="Escolher tom visual"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Nome da cor (ex: Bege Areia, Verde Oliva...)"
+                            value={newColorName}
+                            onChange={(e) => setNewColorName(e.target.value)}
+                            className="flex-1 px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+
+                        {/* Optional photo for new color */}
+                        <div className="flex items-center gap-2">
+                          {newColorImage ? (
+                            <div className="flex items-center gap-2 flex-1 bg-neutral-950 px-2.5 py-1.5 rounded-lg border border-neutral-800">
+                              <img src={newColorImage} alt="Preview" className="w-6 h-6 rounded object-cover" />
+                              <span className="text-[11px] text-neutral-300 truncate flex-1">Foto da cor pronta</span>
+                              <button
+                                type="button"
+                                onClick={() => setNewColorImage('')}
+                                className="text-red-400 hover:text-red-300 text-xs font-bold"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTargetColorIndexForUpload(-1);
+                                colorFileInputRef.current?.click();
+                              }}
+                              className="flex-1 py-1.5 px-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-[11px] font-bold text-neutral-300 hover:text-white flex items-center justify-center gap-1.5 transition"
+                            >
+                              <Upload className="w-3 h-3 text-amber-400" />
+                              <span>+ Anexar Foto para esta Cor (Opcional)</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleAddColor}
+                            className="px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 text-xs font-bold transition flex items-center gap-1 shadow-sm shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Adicionar</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1277,6 +1656,216 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {/* TAB: GESTÃO DE CATEGORIAS */}
+          {activeTab === 'categories' && (
+            <div className="space-y-6 max-w-4xl mx-auto">
+              <div className="pb-3 border-b border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-base font-black text-white font-['Cabinet_Grotesk',sans-serif]">
+                      Gestão de Categorias da Loja
+                    </h3>
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Cria, renomeia e organiza as categorias dos produtos da marca Strong.
+                  </p>
+                </div>
+              </div>
+
+              {catActionFeedback && (
+                <div className="p-3.5 rounded-xl bg-amber-400/15 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center justify-between animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>{catActionFeedback}</span>
+                  </div>
+                  <button
+                    onClick={() => setCatActionFeedback(null)}
+                    className="text-neutral-400 hover:text-white text-xs px-2"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              )}
+
+              {/* Box to create new category */}
+              <div className="p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 space-y-4">
+                <h4 className="text-xs font-bold text-neutral-200 uppercase tracking-wider flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-amber-400" />
+                  Criar Nova Categoria
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-400 mb-1">
+                      Nome da Categoria (visível na loja):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Calças & Shorts, Acessórios, Casacos..."
+                      value={newCatName}
+                      onChange={(e) => {
+                        setNewCatName(e.target.value);
+                        if (!newCatId || newCatId === newCatName.toLowerCase().replace(/[^a-z0-9]/g, '')) {
+                          setNewCatId(
+                            e.target.value
+                              .toLowerCase()
+                              .normalize('NFD')
+                              .replace(/[\u0300-\u036f]/g, '')
+                              .replace(/[^a-z0-9]+/g, '-')
+                              .replace(/(^-|-$)+/g, '')
+                          );
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-400 mb-1">
+                      Slug / Identificador (opcional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: calcas-shorts"
+                      value={newCatId}
+                      onChange={(e) => setNewCatId(e.target.value)}
+                      className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-300 font-mono focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateCategory(newCatName, newCatId)}
+                    disabled={!newCatName.trim()}
+                    className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Salvar Categoria</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* List of active categories */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                    Categorias Ativas ({currentCategories.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Desejas restaurar as categorias padrão (T-shirts, Chapéus & Bonés, Hoodies)?')) {
+                        onUpdateConfig({
+                          ...config,
+                          categories: [
+                            { id: 'tshirts', name: 'T-shirts & Oversized' },
+                            { id: 'chapeus', name: 'Chapéus & Bonés' },
+                            { id: 'hoodies', name: 'Moletom & Hoodies' },
+                          ],
+                        });
+                        setCatActionFeedback('Categorias padrão restauradas com sucesso.');
+                        setTimeout(() => setCatActionFeedback(null), 3000);
+                      }
+                    }}
+                    className="text-[11px] text-neutral-400 hover:text-amber-400 transition"
+                  >
+                    Restaurar Padrão
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5">
+                  {currentCategories.map((category) => {
+                    const count = products.filter((p) => p.category === category.id).length;
+                    const isEditing = editingCatId === category.id;
+
+                    return (
+                      <div
+                        key={category.id}
+                        className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-3 hover:border-neutral-700 transition"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-9 h-9 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400 shrink-0">
+                            <Tag className="w-4 h-4" />
+                          </div>
+
+                          {isEditing ? (
+                            <div className="flex-1 flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingCatName}
+                                onChange={(e) => setEditingCatName(e.target.value)}
+                                autoFocus
+                                className="px-2.5 py-1 bg-neutral-900 border border-amber-400 rounded text-xs text-white focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditCategory(category.id)}
+                                className="px-2.5 py-1 rounded bg-amber-400 text-neutral-950 text-xs font-bold"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCatId(null);
+                                  setEditingCatName('');
+                                }}
+                                className="px-2 py-1 text-neutral-400 hover:text-white text-xs"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h5 className="text-sm font-bold text-white truncate">{category.name}</h5>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-400">
+                                  slug: {category.id}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-neutral-400">
+                                {count} {count === 1 ? 'artigo cadastrado' : 'artigos cadastrados'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {!isEditing && (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCatId(category.id);
+                                setEditingCatName(category.name);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-bold text-neutral-300 hover:text-white transition flex items-center gap-1"
+                              title="Editar nome da categoria"
+                            >
+                              <Edit2 className="w-3 h-3 text-amber-400" />
+                              <span>Editar</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(category.id)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-neutral-900 transition"
+                              title="Eliminar categoria"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* TAB: PRODUTO EM DESTAQUE */}
@@ -1475,23 +2064,29 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                 {/* Category Filter Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                  {[
-                    { id: 'todos', label: 'Todos os Artigos' },
-                    { id: 'tshirts', label: 'T-Shirts' },
-                    { id: 'chapeus', label: 'Chapéus / Bonés' },
-                    { id: 'hoodies', label: 'Moletom / Hoodies' },
-                  ].map((cat) => (
+                  <button
+                    type="button"
+                    onClick={() => setFeaturedCategoryFilter('todos')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      featuredCategoryFilter === 'todos'
+                        ? 'bg-amber-400 text-neutral-950 shadow-sm'
+                        : 'bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800'
+                    }`}
+                  >
+                    Todos os Artigos
+                  </button>
+                  {currentCategories.map((cat) => (
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => setFeaturedCategoryFilter(cat.id as any)}
+                      onClick={() => setFeaturedCategoryFilter(cat.id)}
                       className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap ${
                         featuredCategoryFilter === cat.id
                           ? 'bg-amber-400 text-neutral-950 shadow-sm'
                           : 'bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800'
                       }`}
                     >
-                      {cat.label}
+                      {cat.name}
                     </button>
                   ))}
                 </div>
@@ -1928,24 +2523,29 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/40 space-y-3">
+              <div className="p-4 rounded-xl bg-red-950/40 border border-red-900/60 space-y-3">
                 <h4 className="text-xs font-bold text-red-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <RotateCcw className="w-4 h-4 text-red-400" />
-                  Restaurar Catálogo Original de Fábrica
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                  Zerar e Limpar Todos os Produtos
                 </h4>
                 <p className="text-xs text-neutral-400">
-                  Restaura o catálogo padrão com as fotos autênticas da marca Strong (T-shirts oversized e chapéus/bonés).
+                  Apaga todos os produtos antigos do site, deixando o catálogo completamente limpo para você cadastrar seus artigos do zero.
                 </p>
                 <button
                   onClick={() => {
-                    if (confirm('Tem certeza de que deseja restaurar o catálogo padrão da marca Strong? Todas as edições locais serão substituídas pelos produtos originais.')) {
-                      onResetToDefaults();
+                    if (confirm('Tem certeza absoluta de que deseja LIMPAR TODOS os produtos do site? O catálogo ficará 100% limpo para novos cadastros.')) {
+                      if (onClearAllProducts) {
+                        onClearAllProducts();
+                      } else {
+                        onResetToDefaults();
+                      }
                       setActiveTab('products');
                     }
                   }}
-                  className="px-4 py-2 rounded-lg bg-red-900/60 hover:bg-red-800 text-red-100 font-bold text-xs transition"
+                  className="px-4 py-2 rounded-lg bg-red-800 hover:bg-red-700 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer"
                 >
-                  Restaurar Produtos Padrão
+                  <Trash2 className="w-4 h-4" />
+                  Limpar Todo o Catálogo (Zerar Site)
                 </button>
               </div>
             </div>
