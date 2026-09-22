@@ -56,7 +56,7 @@ export const Hero: React.FC<HeroProps> = ({
             </h1>
 
             <p className="text-neutral-300 text-base sm:text-lg max-w-xl leading-relaxed">
-              Descobre as nossas T-shirts oversized com algodão premium e os chapéus bucket & bonés icónicos. 
+              Descobre as nossas T-shirts oversized com tecido premium e os chapéus bucket & bonés icónicos. 
               Personaliza a tua cor favorita, junta ao carrinho e recebe a confirmação imediata no WhatsApp.
             </p>
 
@@ -101,7 +101,7 @@ export const Hero: React.FC<HeroProps> = ({
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-200">100% Algodão</h4>
+                  <h4 className="text-xs font-bold text-neutral-200">Tecido</h4>
                   <p className="text-[11px] text-neutral-400">Gramatura pesada 240g</p>
                 </div>
               </div>
