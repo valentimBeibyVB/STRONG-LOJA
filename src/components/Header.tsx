@@ -44,14 +44,22 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-20 gap-4">
           {/* Brand Logo */}
           <div className="flex items-center gap-4">
-            <a href="#" className="group flex items-center gap-2.5 focus:outline-none" aria-label="Strong Brand Home">
-              <div className="w-10 h-10 bg-amber-400 text-neutral-950 flex items-center justify-center font-black text-xl tracking-tighter rounded-md transform transition-transform group-hover:scale-105 shadow-md shadow-amber-400/20">
-                ST
+            <a href="#" className="group flex items-center gap-3 focus:outline-none" aria-label="Strong Brand Home">
+              <div className="relative w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden transform transition-all group-hover:scale-105 group-hover:border-amber-400/70 shadow-lg shadow-black/40 group-hover:shadow-amber-400/10">
+                <img
+                  src={config.logoUrl || '/strong-logo.jpg'}
+                  alt={`${config.storeName} Logo`}
+                  className="w-full h-full object-contain rounded-lg"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-black tracking-widest text-white font-['Cabinet_Grotesk',sans-serif]">
-                  {config.storeName}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-black tracking-widest text-white font-['Cabinet_Grotesk',sans-serif]">
+                    {config.storeName}
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                </div>
                 <span className="text-[10px] uppercase font-bold tracking-[0.25em] text-neutral-400 -mt-1">
                   APPAREL & STREETWEAR
                 </span>

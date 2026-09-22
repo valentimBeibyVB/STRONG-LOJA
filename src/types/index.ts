@@ -53,6 +53,7 @@ export interface StoreConfig {
   adminPassword?: string;
   featuredProductId?: string; // ID do produto em destaque principal
   featuredSubtitle?: string; // Título/badge customizado do destaque (ex: "Destaque da Coleção")
+  logoUrl?: string; // URL ou path do logo oficial da marca
   categories?: CategoryItem[];
 }
 

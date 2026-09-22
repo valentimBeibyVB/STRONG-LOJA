@@ -110,9 +110,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="p-6 sm:p-8 flex flex-col justify-between space-y-6">
             <div>
               {/* Category & Title */}
-              <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
-                {config.categories?.find((c) => c.id === product.category)?.name || product.category}
-              </span>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-md bg-neutral-950 border border-neutral-800 p-0.5 flex items-center justify-center overflow-hidden shrink-0">
+                  <img
+                    src={config.logoUrl || '/strong-logo.jpg'}
+                    alt={config.storeName}
+                    className="w-full h-full object-contain rounded-sm"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
+                  {config.categories?.find((c) => c.id === product.category)?.name || product.category}
+                </span>
+              </div>
               <h2 className="text-2xl font-black text-white mt-1 font-['Cabinet_Grotesk',sans-serif]">
                 {product.name}
               </h2>

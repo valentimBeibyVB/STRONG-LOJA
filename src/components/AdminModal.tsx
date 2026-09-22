@@ -156,6 +156,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync settings form when config changes
   useEffect(() => {
@@ -400,6 +401,47 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           );
         }
         setTargetColorIndexForUpload(null);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Logo file upload with canvas compression
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 500;
+        const MAX_HEIGHT = 500;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = Math.round(width);
+        canvas.height = Math.round(height);
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, Math.round(width), Math.round(height));
+
+        const dataUrl = canvas.toDataURL('image/png');
+        setSettingsForm((prev) => ({ ...prev, logoUrl: dataUrl }));
       };
       img.src = event.target?.result as string;
     };
@@ -698,16 +740,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
         <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-inner">
-              <Lock className="w-7 h-7" />
+          <div className="text-center space-y-3">
+            <div className="relative w-16 h-16 mx-auto rounded-2xl bg-neutral-950 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden shadow-xl">
+              <img
+                src={config.logoUrl || '/strong-logo.jpg'}
+                alt={config.storeName}
+                className="w-full h-full object-contain rounded-xl"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-400 text-neutral-950 flex items-center justify-center shadow">
+                <Lock className="w-3.5 h-3.5" />
+              </div>
             </div>
-            <h2 className="text-xl font-black text-white tracking-wide font-['Cabinet_Grotesk',sans-serif]">
-              Acesso Administrativo Restrito
-            </h2>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Área de gestão isolada da loja de compra. Introduza o código de segurança para aceder ao catálogo, preços e configurações.
-            </p>
+            <div>
+              <h2 className="text-xl font-black text-white tracking-wide font-['Cabinet_Grotesk',sans-serif]">
+                Acesso Administrativo Restrito
+              </h2>
+              <p className="text-xs text-neutral-400 leading-relaxed mt-1">
+                Área de gestão isolada da loja de compra. Introduza o código de segurança para aceder ao catálogo, preços e configurações.
+              </p>
+            </div>
           </div>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
@@ -777,8 +829,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       {/* Top Header */}
       <div className="px-5 py-3.5 border-b border-neutral-800 flex items-center justify-between bg-neutral-900 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-400 text-neutral-950 flex items-center justify-center font-black text-sm shadow-sm">
-            ADM
+          <div className="w-9 h-9 rounded-xl bg-neutral-950 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden shadow-sm shrink-0">
+            <img
+              src={config.logoUrl || '/strong-logo.jpg'}
+              alt={config.storeName}
+              className="w-full h-full object-contain rounded-lg"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -2178,10 +2235,55 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           {activeTab === 'settings' && (
             <form onSubmit={handleSaveSettings} className="space-y-6 max-w-2xl mx-auto">
               <div className="pb-3 border-b border-neutral-800">
-                <h3 className="text-sm font-black text-white">Configuração do WhatsApp de Vendas</h3>
+                <h3 className="text-sm font-black text-white">Configurações Gerais da Marca & Vendas</h3>
                 <p className="text-xs text-neutral-400">
-                  Para onde devem ser enviadas as mensagens quando o cliente clica em "Finalizar Compra no WhatsApp".
+                  Gestão do logótipo oficial, número do WhatsApp de encomendas e definições da loja.
                 </p>
+              </div>
+
+              {/* Brand Logo Configuration */}
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Logótipo Oficial da Marca (Logo)</h4>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Símbolo oficial do Gorila Strong exibido no cabeçalho, rodapé e painel da loja.
+                    </p>
+                  </div>
+                  <div className="w-14 h-14 rounded-xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                    <img
+                      src={settingsForm.logoUrl || '/strong-logo.jpg'}
+                      alt="Logo Preview"
+                      className="w-full h-full object-contain rounded-lg"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <input
+                    type="file"
+                    ref={logoFileInputRef}
+                    onChange={handleLogoFileUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Carregar Novo Logo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsForm((prev) => ({ ...prev, logoUrl: '/strong-logo.jpg' }))}
+                    className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 text-xs font-medium transition"
+                  >
+                    Restaurar Logo Oficial (Gorila)
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">

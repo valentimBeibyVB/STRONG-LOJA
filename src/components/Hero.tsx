@@ -36,9 +36,14 @@ export const Hero: React.FC<HeroProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           {/* Left Column Text Content */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-800 border border-neutral-700/80 text-amber-400 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              Coleção Autêntica • Streetwear & Essentials
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-neutral-900 border border-neutral-700/80 text-amber-400 text-xs font-bold uppercase tracking-wider shadow-md">
+              <img
+                src={config?.logoUrl || '/strong-logo.jpg'}
+                alt="Logo Strong"
+                className="w-5 h-5 rounded-full object-cover border border-amber-400/40"
+                referrerPolicy="no-referrer"
+              />
+              <span>Coleção Autêntica • Streetwear & Essentials</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white font-['Cabinet_Grotesk',sans-serif] leading-[1.05]">

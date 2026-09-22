@@ -14,13 +14,23 @@ export const Footer: React.FC<FooterProps> = ({ config, onOpenAdmin }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           {/* Col 1: Brand */}
           <div className="space-y-3 md:col-span-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-amber-400 text-neutral-950 flex items-center justify-center font-black text-sm rounded">
-                ST
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 p-0.5 flex items-center justify-center overflow-hidden shadow-md">
+                <img
+                  src={config.logoUrl || '/strong-logo.jpg'}
+                  alt={`${config.storeName} Logo`}
+                  className="w-full h-full object-contain rounded-lg"
+                  referrerPolicy="no-referrer"
+                />
               </div>
-              <span className="text-xl font-black text-white tracking-widest font-['Cabinet_Grotesk',sans-serif]">
-                {config.storeName}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-white tracking-widest font-['Cabinet_Grotesk',sans-serif]">
+                  {config.storeName}
+                </span>
+                <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-neutral-500 -mt-0.5">
+                  OFFICIAL APPAREL
+                </span>
+              </div>
             </div>
             <p className="text-neutral-400 max-w-sm leading-relaxed">
               Marca de roupa focada em streetwear, T-shirts oversized de alta gramatura e chapéus/bonés autênticos.
