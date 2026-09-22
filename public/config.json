@@ -9,11 +9,24 @@
   "instagramHandle": "@strong.brand",
   "address": "Luanda, Angola | Entregas para todo o país",
   "adminPassword": "admin",
-  "featuredProductId": "",
+  "featuredProductId": "strong-item-1790061523292",
   "featuredSubtitle": "Destaque da Coleção",
   "categories": [
-    { "id": "tshirts", "name": "T-shirts & Oversized" },
-    { "id": "chapeus", "name": "Chapéus & Bonés" },
-    { "id": "hoodies", "name": "Moletom & Hoodies" }
+    {
+      "id": "tshirts",
+      "name": "T-shirts & Oversized"
+    },
+    {
+      "id": "chapeus",
+      "name": "Chapéus & Bonés"
+    },
+    {
+      "id": "hoodies",
+      "name": "Moletom & Hoodies"
+    },
+    {
+      "id": "regadas",
+      "name": "Regata"
+    }
   ]
 }
