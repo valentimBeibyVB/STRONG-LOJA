@@ -11,6 +11,7 @@
   "adminPassword": "admin",
   "featuredProductId": "strong-item-1790061523292",
   "featuredSubtitle": "Destaque da Coleção",
+  "logoUrl": "/strong-logo.jpg",
   "categories": [
     {
       "id": "tshirts",

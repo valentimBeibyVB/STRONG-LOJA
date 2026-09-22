@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageCircle, Instagram, Github, Heart, Lock } from 'lucide-react';
 import { StoreConfig } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 interface FooterProps {
   config: StoreConfig;
@@ -15,14 +16,13 @@ export const Footer: React.FC<FooterProps> = ({ config, onOpenAdmin }) => {
           {/* Col 1: Brand */}
           <div className="space-y-3 md:col-span-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 p-0.5 flex items-center justify-center overflow-hidden shadow-md">
-                <img
-                  src={config.logoUrl || '/strong-logo.jpg'}
-                  alt={`${config.storeName} Logo`}
-                  className="w-full h-full object-contain rounded-lg"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
+              <BrandLogo
+                src={config.logoUrl}
+                alt={`${config.storeName} Logo`}
+                size="sm"
+                shape="rounded"
+                className="w-10 h-10 border border-neutral-800 p-0.5 shadow-md shrink-0"
+              />
               <div className="flex flex-col">
                 <span className="text-xl font-black text-white tracking-widest font-['Cabinet_Grotesk',sans-serif]">
                   {config.storeName}

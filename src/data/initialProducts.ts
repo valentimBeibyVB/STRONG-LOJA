@@ -42,7 +42,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     "originalPrice": 9000,
     "description": "Tecido poliéster ideal para um clima quente.",
     "details": [
-      "Produção autêntica Strong Apparel",
+      "Produção autêntica Strong Africa",
       "Acabamento e costuras de alta resistência",
       "Corte moderno e confortável"
     ],
@@ -76,7 +76,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     "originalPrice": 10000,
     "description": "Peça da coleção oficial da marca de vestuário Strong. Este é um conjunto do Modelo STYLE de tecido poliéster tendo Chapéu e uma Tshirt",
     "details": [
-      "Produção autêntica Strong Apparel",
+      "Produção autêntica Strong Africa",
       "Acabamento e costuras de alta resistência",
       "Corte moderno e confortável"
     ],
@@ -122,7 +122,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     "originalPrice": 8000,
     "description": "O tecido de poliéster é um material sintético feito de polímeros plásticos derivados do petróleo, amplamente conhecido pela sua alta durabilidade e praticidade",
     "details": [
-      "Produção autêntica Strong Apparel",
+      "Produção autêntica Strong Africa",
       "Acabamento e costuras de alta resistência",
       "Corte moderno e confortável"
     ],

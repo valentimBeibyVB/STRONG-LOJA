@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingBag, Shirt, Search, Sparkles } from 'lucide-react';
 import { ProductCategory, StoreConfig } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   cartCount: number;
@@ -45,14 +46,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Brand Logo */}
           <div className="flex items-center gap-4">
             <a href="#" className="group flex items-center gap-3 focus:outline-none" aria-label="Strong Brand Home">
-              <div className="relative w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden transform transition-all group-hover:scale-105 group-hover:border-amber-400/70 shadow-lg shadow-black/40 group-hover:shadow-amber-400/10">
-                <img
-                  src={config.logoUrl || '/strong-logo.jpg'}
-                  alt={`${config.storeName} Logo`}
-                  className="w-full h-full object-contain rounded-lg"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
+              <BrandLogo
+                src={config.logoUrl}
+                alt={`${config.storeName} Logo`}
+                size="md"
+                shape="rounded"
+                className="p-1 border border-neutral-800 transform transition-all group-hover:scale-105 group-hover:border-amber-400/70 shadow-lg shadow-black/40 group-hover:shadow-amber-400/10"
+              />
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-black tracking-widest text-white font-['Cabinet_Grotesk',sans-serif]">

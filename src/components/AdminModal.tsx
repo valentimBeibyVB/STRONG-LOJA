@@ -36,6 +36,7 @@ import {
 import { Product, ProductColor, StoreConfig, SyncLogEntry } from '../types';
 import { formatPrice } from '../utils/whatsapp';
 import { ActivityLog } from './ActivityLog';
+import { BrandLogo } from './BrandLogo';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -567,7 +568,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       originalPrice: formOriginalPrice ? Number(formOriginalPrice) : undefined,
       description: formDescription.trim() || 'Peça da coleção oficial da marca de vestuário Strong.',
       details: existingProduct?.details || [
-        'Produção autêntica Strong Apparel',
+        'Produção autêntica Strong Africa',
         'Acabamento e costuras de alta resistência',
         'Corte moderno e confortável'
       ],
@@ -741,12 +742,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
         <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="text-center space-y-3">
-            <div className="relative w-16 h-16 mx-auto rounded-2xl bg-neutral-950 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden shadow-xl">
-              <img
-                src={config.logoUrl || '/strong-logo.jpg'}
+            <div className="relative w-16 h-16 mx-auto">
+              <BrandLogo
+                src={config.logoUrl}
                 alt={config.storeName}
-                className="w-full h-full object-contain rounded-xl"
-                referrerPolicy="no-referrer"
+                size="lg"
+                shape="rounded"
+                className="w-16 h-16 border border-neutral-800 p-1 shadow-xl"
               />
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-400 text-neutral-950 flex items-center justify-center shadow">
                 <Lock className="w-3.5 h-3.5" />
@@ -829,14 +831,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       {/* Top Header */}
       <div className="px-5 py-3.5 border-b border-neutral-800 flex items-center justify-between bg-neutral-900 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-neutral-950 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden shadow-sm shrink-0">
-            <img
-              src={config.logoUrl || '/strong-logo.jpg'}
-              alt={config.storeName}
-              className="w-full h-full object-contain rounded-lg"
-              referrerPolicy="no-referrer"
-            />
-          </div>
+          <BrandLogo
+            src={config.logoUrl}
+            alt={config.storeName}
+            size="sm"
+            shape="rounded"
+            className="w-9 h-9 border border-neutral-800 p-0.5 shadow-sm shrink-0"
+          />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm sm:text-base font-black text-white font-['Cabinet_Grotesk',sans-serif]">
@@ -2250,14 +2251,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       Símbolo oficial do Gorila Strong exibido no cabeçalho, rodapé e painel da loja.
                     </p>
                   </div>
-                  <div className="w-14 h-14 rounded-xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                    <img
-                      src={settingsForm.logoUrl || '/strong-logo.jpg'}
-                      alt="Logo Preview"
-                      className="w-full h-full object-contain rounded-lg"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
+                  <BrandLogo
+                    src={settingsForm.logoUrl}
+                    alt="Logo Preview"
+                    size="md"
+                    shape="rounded"
+                    className="w-14 h-14 border border-neutral-800 p-1 shadow-inner shrink-0"
+                  />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">

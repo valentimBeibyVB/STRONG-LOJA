@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, CheckCircle2, Eye, MessageCircle, Sparkles, Star, Truck } from 'lucide-react';
 import { Product, ProductCategory, StoreConfig } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 interface HeroProps {
   onSelectCategory: (category: ProductCategory) => void;
@@ -37,11 +38,12 @@ export const Hero: React.FC<HeroProps> = ({
           {/* Left Column Text Content */}
           <div className="lg:col-span-7 space-y-6">
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-neutral-900 border border-neutral-700/80 text-amber-400 text-xs font-bold uppercase tracking-wider shadow-md">
-              <img
-                src={config?.logoUrl || '/strong-logo.jpg'}
+              <BrandLogo
+                src={config?.logoUrl}
                 alt="Logo Strong"
-                className="w-5 h-5 rounded-full object-cover border border-amber-400/40"
-                referrerPolicy="no-referrer"
+                size="xs"
+                shape="circle"
+                className="border border-amber-400/40 shrink-0"
               />
               <span>Coleção Autêntica • Streetwear & Essentials</span>
             </div>
@@ -49,7 +51,7 @@ export const Hero: React.FC<HeroProps> = ({
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white font-['Cabinet_Grotesk',sans-serif] leading-[1.05]">
               Veste a Tua Força.{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500">
-                Strong Apparel.
+                Strong Africa.
               </span>
             </h1>
 

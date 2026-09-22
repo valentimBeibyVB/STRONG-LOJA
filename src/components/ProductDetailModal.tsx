@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, MessageCircle, Check, Shield, Truck, RotateCcw } from 'lucide-react';
 import { Product, ProductColor, StoreConfig } from '../types';
 import { formatPrice, generateDirectProductWhatsAppUrl } from '../utils/whatsapp';
+import { BrandLogo } from './BrandLogo';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -111,14 +112,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div>
               {/* Category & Title */}
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-md bg-neutral-950 border border-neutral-800 p-0.5 flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    src={config.logoUrl || '/strong-logo.jpg'}
-                    alt={config.storeName}
-                    className="w-full h-full object-contain rounded-sm"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
+                <BrandLogo
+                  src={config.logoUrl}
+                  alt={config.storeName}
+                  size="xs"
+                  shape="rounded"
+                  className="w-5 h-5 border border-neutral-800 p-0.5 shrink-0"
+                />
                 <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
                   {config.categories?.find((c) => c.id === product.category)?.name || product.category}
                 </span>
