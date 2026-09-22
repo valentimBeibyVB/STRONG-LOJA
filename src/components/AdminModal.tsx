@@ -2373,6 +2373,67 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   />
                 </div>
 
+                {/* Multicaixa Express Direct Payment Configuration */}
+                <div className="p-4 rounded-xl bg-neutral-950 border border-emerald-500/30 space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-emerald-400">
+                      <Smartphone className="w-4 h-4" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider">Pagamentos por Multicaixa Express</h4>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/80 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Ativo no Carrinho
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Permite que os clientes paguem por <strong>Multicaixa Express (Enviar Dinheiro)</strong> ou transferência diretamente para a tua conta, sem necessidade de contratos caros ou gateways de pagamento. O cliente copia o número com 1 clique e envia o comprovativo no WhatsApp.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-1">
+                        Número de Telemóvel Express:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 953488842"
+                        value={settingsForm.expressPhoneNumber || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, expressPhoneNumber: e.target.value })}
+                        className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-400 font-mono font-bold"
+                      />
+                      <p className="text-[10px] text-neutral-500 mt-1">Número para onde o cliente faz o "Enviar Dinheiro".</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-1">
+                        Nome do Titular da Conta:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Strong Africa ou o teu Nome"
+                        value={settingsForm.expressAccountHolder || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, expressAccountHolder: e.target.value })}
+                        className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-400"
+                      />
+                      <p className="text-[10px] text-neutral-500 mt-1">O cliente confere este nome na app antes do PIN.</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-1">
+                      IBAN Bancário (Opcional para Transferência Direta):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: AO06 0040 0000 0000 0000 0000 0"
+                      value={settingsForm.expressIban || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, expressIban: e.target.value })}
+                      className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-400 font-mono"
+                    />
+                    <p className="text-[10px] text-neutral-500 mt-1">Aparece como alternativa caso o cliente prefira transferência bancária direta.</p>
+                  </div>
+                </div>
+
                 {/* Secret Admin Access Code Setting */}
                 <div className="p-4 rounded-xl bg-neutral-950 border border-amber-400/20 space-y-3 mt-4">
                   <div className="flex items-center gap-2 text-amber-400">

@@ -11,7 +11,10 @@
   "adminPassword": "admin",
   "featuredProductId": "strong-item-1790061523292",
   "featuredSubtitle": "Destaque da Coleção",
-  "logoUrl": "/strong-logo.jpg",
+  "logoUrl": "./strong-logo.jpg",
+  "expressPhoneNumber": "944986967",
+  "expressAccountHolder": "GILBERTO LOURENÇO GOLAMBOLE",
+  "expressIban": "",
   "categories": [
     {
       "id": "tshirts",

@@ -1,5 +1,23 @@
-import React, { useState } from 'react';
-import { X, Trash2, ShoppingBag, MessageCircle, ArrowRight, Check, Copy, User, MapPin, CreditCard, FileText } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import {
+  X,
+  Trash2,
+  ShoppingBag,
+  MessageCircle,
+  ArrowRight,
+  Check,
+  Copy,
+  User,
+  MapPin,
+  FileText,
+  Smartphone,
+  Upload,
+  Image as ImageIcon,
+  CheckCircle2,
+  ShieldCheck,
+  Info,
+  Loader2,
+} from 'lucide-react';
 import { CartItem, CheckoutCustomerInfo, StoreConfig } from '../types';
 import { formatPrice, generateWhatsAppOrderUrl } from '../utils/whatsapp';
 
@@ -27,16 +45,91 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     phone: '',
     city: '',
     notes: '',
-    paymentMethod: 'Transferência / Multicaixa Express',
+    paymentMethod: 'Multicaixa Express',
+    expressSenderPhone: '',
+    expressSenderName: '',
+    expressReceiptPreview: undefined,
+    expressReceiptUrl: undefined,
   });
 
   const [showCustomerForm, setShowCustomerForm] = useState(true);
   const [copiedNotification, setCopiedNotification] = useState(false);
+  const [copiedExpressPhone, setCopiedExpressPhone] = useState(false);
+  const [copiedExpressIban, setCopiedExpressIban] = useState(false);
+  const [showIbanDetails, setShowIbanDetails] = useState(false);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+
+  const receiptFileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
   const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const expressPhone = (config.expressPhoneNumber || config.whatsappNumber || '953488842').trim();
+  const expressHolder = (config.expressAccountHolder || 'Strong Africa').trim();
+
+  const handleCopyExpressPhone = () => {
+    navigator.clipboard.writeText(expressPhone.replace(/\s+/g, ''));
+    setCopiedExpressPhone(true);
+    setTimeout(() => setCopiedExpressPhone(false), 2000);
+  };
+
+  const handleCopyExpressIban = () => {
+    if (!config.expressIban) return;
+    navigator.clipboard.writeText(config.expressIban.replace(/\s+/g, ''));
+    setCopiedExpressIban(true);
+    setTimeout(() => setCopiedExpressIban(false), 2000);
+  };
+
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingReceipt(true);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      setCustomerInfo((prev) => ({
+        ...prev,
+        expressReceiptPreview: dataUrl,
+      }));
+
+      // Automatically upload to backend to create an online link for WhatsApp
+      try {
+        const response = await fetch('/api/upload-receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: dataUrl }),
+        });
+        if (response.ok) {
+          const resData = await response.json();
+          if (resData.receiptUrl) {
+            setCustomerInfo((prev) => ({
+              ...prev,
+              expressReceiptUrl: resData.receiptUrl,
+            }));
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Erro ao carregar comprovativo para o servidor:', uploadErr);
+      } finally {
+        setIsUploadingReceipt(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveReceipt = () => {
+    setCustomerInfo((prev) => ({
+      ...prev,
+      expressReceiptPreview: undefined,
+      expressReceiptUrl: undefined,
+    }));
+    if (receiptFileInputRef.current) {
+      receiptFileInputRef.current.value = '';
+    }
+  };
 
   const handleCheckoutWhatsApp = () => {
     if (items.length === 0) return;
@@ -47,11 +140,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const handleCopySummary = () => {
     const orderText = `*ENCOMENDA STRONG*\n` +
       items.map(i => `• ${i.name} | Cor: ${i.selectedColor.name} | Tam: ${i.selectedSize} | ${i.quantity}x = ${formatPrice(i.price * i.quantity, config)}`).join('\n') +
-      `\nTotal: ${formatPrice(totalAmount, config)}`;
+      `\nTotal: ${formatPrice(totalAmount, config)}` +
+      (customerInfo.paymentMethod.includes('Multicaixa Express') ? `\nPagamento: Multicaixa Express (${expressHolder})` : `\nPagamento: ${customerInfo.paymentMethod}`);
     navigator.clipboard.writeText(orderText);
     setCopiedNotification(true);
     setTimeout(() => setCopiedNotification(false), 2000);
   };
+
+  const isExpressSelected = customerInfo.paymentMethod === 'Multicaixa Express';
+  const isPagarNoLocal = customerInfo.paymentMethod === 'Pagar no Local';
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -248,22 +345,295 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-[11px] text-neutral-400 mb-1 font-medium">
-                          Forma de Pagamento:
+                      {/* Forma de Pagamento Selector */}
+                      <div className="space-y-2 pt-1">
+                        <label className="block text-[11px] text-neutral-300 font-bold uppercase tracking-wider">
+                          Escolhe a Forma de Pagamento:
                         </label>
-                        <select
-                          value={customerInfo.paymentMethod}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, paymentMethod: e.target.value })}
-                          className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-md text-xs text-white focus:outline-none focus:border-amber-400"
-                        >
-                          <option value="Transferência / Multicaixa Express">Transferência / Multicaixa Express</option>
-                          <option value="MBWay">MBWay</option>
-                          <option value="Dinheiro no Ato da Entrega">Dinheiro no Ato da Entrega</option>
-                          <option value="Cartão de Débito/Crédito">Cartão de Débito/Crédito</option>
-                          <option value="A combinar no WhatsApp">A combinar no WhatsApp</option>
-                        </select>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Option 1: Multicaixa Express */}
+                          <button
+                            type="button"
+                            onClick={() => setCustomerInfo({ ...customerInfo, paymentMethod: 'Multicaixa Express' })}
+                            className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between relative overflow-hidden ${
+                              isExpressSelected
+                                ? 'bg-emerald-950/40 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500/50'
+                                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full mb-1">
+                              <Smartphone className={`w-4 h-4 ${isExpressSelected ? 'text-emerald-400' : 'text-neutral-400'}`} />
+                              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                Recomendado
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-xs font-black text-white">Multicaixa Express</div>
+                              <div className="text-[10px] text-neutral-400 mt-0.5">Enviar Dinheiro</div>
+                            </div>
+                          </button>
+
+                          {/* Option 2: Pagar no Local (em vez de TPA) */}
+                          <button
+                            type="button"
+                            onClick={() => setCustomerInfo({ ...customerInfo, paymentMethod: 'Pagar no Local' })}
+                            className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between relative overflow-hidden ${
+                              isPagarNoLocal
+                                ? 'bg-amber-950/30 border-amber-400 text-white shadow-sm ring-1 ring-amber-400/50'
+                                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full mb-1">
+                              <MapPin className={`w-4 h-4 ${isPagarNoLocal ? 'text-amber-400' : 'text-neutral-400'}`} />
+                              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-400 border border-amber-400/30">
+                                Em Mãos
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-xs font-black text-white">Pagar no Local</div>
+                              <div className="text-[10px] text-neutral-400 mt-0.5">Dinheiro na Entrega</div>
+                            </div>
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Informações para Pagar no Local */}
+                      {isPagarNoLocal && (
+                        <div className="p-3.5 rounded-xl bg-neutral-950 border border-amber-400/30 space-y-2">
+                          <div className="flex items-center gap-2 text-amber-400">
+                            <MapPin className="w-4 h-4" />
+                            <h4 className="text-xs font-black uppercase tracking-wider">
+                              Pagar no Local da Entrega
+                            </h4>
+                          </div>
+                          <p className="text-[11px] text-neutral-300 leading-relaxed">
+                            O pagamento é feito em <span className="text-white font-bold">dinheiro físico</span> diretamente ao estafeta no momento da entrega das tuas peças. Prepara a quantia exata de <span className="text-amber-400 font-bold">{formatPrice(totalAmount, config)}</span> para agilizar o processo.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Multicaixa Express Direct Station */}
+                      {isExpressSelected && (
+                        <div className="p-3.5 rounded-xl bg-gradient-to-b from-neutral-900 to-neutral-950 border border-emerald-500/40 space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-emerald-500 text-neutral-950 flex items-center justify-center font-black text-xs shadow-sm">
+                                MCX
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                                  Multicaixa Express
+                                </h4>
+                                <span className="text-[10px] text-emerald-400 font-medium">
+                                  Envio de Dinheiro Direto por Telemóvel
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                              Sem taxas extra
+                            </span>
+                          </div>
+
+                          {/* Valor e Titular */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between bg-neutral-950/90 p-2.5 rounded-lg border border-neutral-800">
+                              <div>
+                                <span className="text-[10px] text-neutral-400 uppercase font-semibold block">
+                                  Valor a Enviar:
+                                </span>
+                                <span className="text-sm font-black text-amber-400">
+                                  {formatPrice(totalAmount, config)}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] text-neutral-400 uppercase font-semibold block">
+                                  Titular da Conta:
+                                </span>
+                                <span className="text-xs font-bold text-white">
+                                  {expressHolder}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Número para Copiar */}
+                            <div className="bg-neutral-950 p-2.5 rounded-lg border border-emerald-500/30 flex items-center justify-between gap-2">
+                              <div>
+                                <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wider">
+                                  Número de Telemóvel Express:
+                                </span>
+                                <span className="text-sm font-mono font-black text-white tracking-wider">
+                                  {expressPhone}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleCopyExpressPhone}
+                                className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+                                  copiedExpressPhone
+                                    ? 'bg-emerald-500 text-neutral-950'
+                                    : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40'
+                                }`}
+                              >
+                                {copiedExpressPhone ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Copiado!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copiar</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* IBAN opcional se configurado */}
+                            {config.expressIban && (
+                              <div className="pt-1">
+                                {!showIbanDetails ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowIbanDetails(true)}
+                                    className="text-[10px] text-neutral-400 hover:text-white underline"
+                                  >
+                                    Preferes Transferência Bancária? Ver IBAN
+                                  </button>
+                                ) : (
+                                  <div className="p-2 rounded bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-2 mt-1">
+                                    <div className="truncate">
+                                      <span className="text-[9px] text-neutral-400 block uppercase">IBAN:</span>
+                                      <span className="text-[11px] font-mono text-white truncate block">
+                                        {config.expressIban}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleCopyExpressIban}
+                                      className="px-2 py-1 rounded text-[10px] font-bold bg-neutral-800 text-neutral-300 hover:text-white shrink-0"
+                                    >
+                                      {copiedExpressIban ? 'Copiado!' : 'Copiar'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3 Passos Rápidos */}
+                          <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800 text-[11px] space-y-1 text-neutral-300">
+                            <div className="font-bold text-neutral-200 text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1">
+                              <Info className="w-3 h-3 text-emerald-400" />
+                              Como pagar em 3 passos:
+                            </div>
+                            <p className="flex items-start gap-1.5 text-neutral-400 text-[11px]">
+                              <span className="font-bold text-emerald-400 shrink-0">1.</span>
+                              Abre o teu app <strong>Multicaixa Express</strong> no telemóvel.
+                            </p>
+                            <p className="flex items-start gap-1.5 text-neutral-400 text-[11px]">
+                              <span className="font-bold text-emerald-400 shrink-0">2.</span>
+                              Vai a <strong>"Enviar Dinheiro"</strong> e cola o número copiado acima.
+                            </p>
+                            <p className="flex items-start gap-1.5 text-neutral-400 text-[11px]">
+                              <span className="font-bold text-emerald-400 shrink-0">3.</span>
+                              Insere o valor de <strong>{formatPrice(totalAmount, config)}</strong> e autoriza com o teu PIN.
+                            </p>
+                          </div>
+
+                          {/* Dados de validação do cliente */}
+                          <div className="space-y-2.5 pt-1 border-t border-neutral-800/80">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[11px] text-neutral-300 font-medium mb-1">
+                                  Telemóvel que Enviou (Express):
+                                </label>
+                                <input
+                                  type="tel"
+                                  placeholder="Ex: 923 xxx xxx"
+                                  value={customerInfo.expressSenderPhone || ''}
+                                  onChange={(e) => setCustomerInfo({ ...customerInfo, expressSenderPhone: e.target.value })}
+                                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-md text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-400"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] text-neutral-300 font-medium mb-1">
+                                  Nome no Express (Opcional):
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Nome da tua conta"
+                                  value={customerInfo.expressSenderName || ''}
+                                  onChange={(e) => setCustomerInfo({ ...customerInfo, expressSenderName: e.target.value })}
+                                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-md text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-400"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Anexo de Comprovativo / Print */}
+                            <div>
+                              <input
+                                type="file"
+                                ref={receiptFileInputRef}
+                                onChange={handleReceiptUpload}
+                                accept="image/*"
+                                className="hidden"
+                              />
+                              
+                              {!customerInfo.expressReceiptPreview ? (
+                                <button
+                                  type="button"
+                                  onClick={() => receiptFileInputRef.current?.click()}
+                                  disabled={isUploadingReceipt}
+                                  className="w-full py-2.5 px-3 rounded-lg border border-dashed border-emerald-500/40 hover:border-emerald-400 bg-neutral-900/60 hover:bg-neutral-900 text-neutral-200 hover:text-white text-xs font-semibold transition flex items-center justify-center gap-2 group"
+                                >
+                                  {isUploadingReceipt ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                                      <span className="text-emerald-400">A processar imagem do comprovativo...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition" />
+                                      <span>Anexar Comprovativo ou Print (Vai no WhatsApp)</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="p-2.5 rounded-lg bg-neutral-900 border border-emerald-500/60 flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2.5 overflow-hidden">
+                                    <img
+                                      src={customerInfo.expressReceiptPreview}
+                                      alt="Comprovativo"
+                                      className="w-10 h-10 rounded object-cover border border-emerald-500/40 shrink-0"
+                                    />
+                                    <div className="truncate">
+                                      <span className="text-[11px] font-bold text-emerald-400 block truncate flex items-center gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 inline" />
+                                        Comprovativo Anexado com Sucesso!
+                                      </span>
+                                      <span className="text-[10px] text-neutral-400 block truncate">
+                                        {customerInfo.expressReceiptUrl
+                                          ? 'Link direto gerado para envio no WhatsApp'
+                                          : 'Pronto para validação no WhatsApp'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveReceipt}
+                                    className="p-1 text-neutral-400 hover:text-red-400 rounded transition shrink-0"
+                                    title="Remover comprovativo"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div>
                         <label className="block text-[11px] text-neutral-400 mb-1 font-medium">
@@ -303,14 +673,26 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Primary WhatsApp Checkout Button */}
+              {/* Primary Action Button */}
               <button
                 id="cart-checkout-whatsapp-btn"
                 onClick={handleCheckoutWhatsApp}
-                className="w-full py-3.5 px-4 rounded-xl font-black text-sm bg-emerald-500 hover:bg-emerald-400 text-neutral-950 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/20 transition transform active:scale-98"
+                className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg transition transform active:scale-98 ${
+                  isExpressSelected
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-emerald-500/25'
+                    : 'bg-amber-400 hover:bg-amber-300 text-neutral-950 shadow-amber-400/20'
+                }`}
               >
-                <MessageCircle className="w-5 h-5 fill-neutral-950" />
-                <span>FINALIZAR COMPRA NO WHATSAPP</span>
+                <MessageCircle className="w-5 h-5 fill-neutral-950 shrink-0" />
+                <span className="truncate">
+                  {isExpressSelected
+                    ? customerInfo.expressReceiptPreview
+                      ? 'Enviar Comprovativo & Finalizar no WhatsApp'
+                      : 'Finalizar no WhatsApp (Multicaixa Express)'
+                    : isPagarNoLocal
+                    ? 'Confirmar Pedido (Pagar no Local)'
+                    : 'Finalizar Compra no WhatsApp'}
+                </span>
               </button>
 
               {/* Secondary actions: Copy summary */}

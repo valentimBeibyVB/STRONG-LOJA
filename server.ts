@@ -278,6 +278,65 @@ async function startServer() {
     }
   });
 
+  // --- Comprovativo de Pagamento (Upload & Acesso Online) ---
+  const receiptStore = new Map<string, { buffer: Buffer; mimeType: string; createdAt: number }>();
+
+  // 1. Upload do comprovativo em base64 com geração de link online para WhatsApp
+  app.post("/api/upload-receipt", express.json({ limit: "20mb" }), (req, res) => {
+    try {
+      const { imageBase64 } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Comprovativo não fornecido" });
+      }
+
+      const matches = imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      let mimeType = "image/jpeg";
+      let buffer: Buffer;
+
+      if (matches && matches.length === 3) {
+        mimeType = matches[1];
+        buffer = Buffer.from(matches[2], "base64");
+      } else {
+        buffer = Buffer.from(imageBase64, "base64");
+      }
+
+      const receiptId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      receiptStore.set(receiptId, {
+        buffer,
+        mimeType,
+        createdAt: Date.now(),
+      });
+
+      const host = req.get("host") || "localhost:3000";
+      const isHttps = req.secure || req.get("x-forwarded-proto") === "https";
+      const protocol = isHttps ? "https" : "http";
+      const receiptUrl = `${protocol}://${host}/api/receipts/${receiptId}`;
+
+      console.log(`[Comprovativo] Novo comprovativo guardado com sucesso: ${receiptId}`);
+
+      return res.json({
+        success: true,
+        id: receiptId,
+        receiptUrl,
+      });
+    } catch (err) {
+      console.error("Error uploading receipt:", err);
+      return res.status(500).json({ error: "Falha ao processar comprovativo" });
+    }
+  });
+
+  // 2. Servir imagem do comprovativo
+  app.get("/api/receipts/:id", (req, res) => {
+    const { id } = req.params;
+    const item = receiptStore.get(id);
+    if (!item) {
+      return res.status(404).send("Comprovativo não encontrado.");
+    }
+    res.setHeader("Content-Type", item.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.send(item.buffer);
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

@@ -55,6 +55,10 @@ export interface StoreConfig {
   featuredSubtitle?: string; // Título/badge customizado do destaque (ex: "Destaque da Coleção")
   logoUrl?: string; // URL ou path do logo oficial da marca
   categories?: CategoryItem[];
+  expressPhoneNumber?: string; // Número de telemóvel associado ao Multicaixa Express
+  expressAccountHolder?: string; // Nome do titular da conta no Multicaixa Express
+  expressIban?: string; // IBAN opcional para transferências bancárias
+  expressInstructions?: string; // Instruções personalizadas de pagamento
 }
 
 export interface CheckoutCustomerInfo {
@@ -63,6 +67,10 @@ export interface CheckoutCustomerInfo {
   city: string;
   notes: string;
   paymentMethod: string;
+  expressSenderPhone?: string; // Número pelo qual o cliente enviou o dinheiro
+  expressSenderName?: string; // Nome do titular que enviou o dinheiro
+  expressReceiptPreview?: string; // Foto/Print do comprovativo em base64
+  expressReceiptUrl?: string; // Link para visualização direta do comprovativo no WhatsApp
 }
 
 export type SyncEventType =

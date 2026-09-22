@@ -49,6 +49,19 @@ export function generateWhatsAppOrderUrl(
     }
     if (customer.paymentMethod) {
       text += `• *Forma de Pagamento:* ${customer.paymentMethod}\n`;
+      if (customer.paymentMethod.includes('Multicaixa Express')) {
+        if (customer.expressSenderPhone?.trim()) {
+          text += `• *Telemóvel do Envio (Express):* ${customer.expressSenderPhone.trim()}\n`;
+        }
+        if (customer.expressSenderName?.trim()) {
+          text += `• *Nome do Titular que Enviou:* ${customer.expressSenderName.trim()}\n`;
+        }
+        if (customer.expressReceiptUrl?.trim()) {
+          text += `📸 *Comprovativo (Ver Online):* ${customer.expressReceiptUrl.trim()}\n`;
+        } else if (customer.expressReceiptPreview) {
+          text += `📸 *Comprovativo de Pagamento:* Anexado a esta conversa\n`;
+        }
+      }
     }
     if (customer.notes.trim()) {
       text += `• *Observações:* ${customer.notes.trim()}\n`;
@@ -56,7 +69,13 @@ export function generateWhatsAppOrderUrl(
     text += `\n`;
   }
 
-  text += `📍 *Aguardo confirmação de disponibilidade e dados para pagamento.*`;
+  if (customer?.paymentMethod?.includes('Multicaixa Express')) {
+    text += `⚡ *Pagamento feito via Multicaixa Express (Enviar Dinheiro) para ${config.expressAccountHolder || 'Strong Africa'}. Comprovativo disponível para conferência imediata!*`;
+  } else if (customer?.paymentMethod === 'Pagar no Local') {
+    text += `📍 *Pagamento no Local escolhido (Dinheiro na entrega). Aguardo confirmação e despacho da encomenda!*`;
+  } else {
+    text += `📍 *Aguardo confirmação de disponibilidade e dados para finalização da encomenda.*`;
+  }
 
   const encodedMessage = encodeURIComponent(text);
   return `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`;
