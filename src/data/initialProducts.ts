@@ -1,23 +1,4 @@
-import { Product, StoreConfig, CategoryItem } from "../types";
-
-export const DEFAULT_CATEGORIES: CategoryItem[] = [
-  {
-    "id": "tshirts",
-    "name": "T-shirts & Oversized"
-  },
-  {
-    "id": "chapeus",
-    "name": "Chapéus & Bonés"
-  },
-  {
-    "id": "hoodies",
-    "name": "Moletom & Hoodies"
-  },
-  {
-    "id": "regadas",
-    "name": "Regata"
-  }
-];
+import { Product, StoreConfig } from "../types";
 
 export const DEFAULT_STORE_CONFIG: StoreConfig = {
   "storeName": "STRONG",
@@ -32,7 +13,6 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
   "adminPassword": "admin",
   "featuredProductId": "strong-item-1790061523292",
   "featuredSubtitle": "Destaque da Coleção",
-  "logoUrl": "/strong-logo.jpg",
   "categories": [
     {
       "id": "tshirts",
