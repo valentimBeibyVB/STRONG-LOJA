@@ -19,7 +19,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { CartItem, CheckoutCustomerInfo, StoreConfig } from '../types';
-import { formatPrice, generateWhatsAppOrderUrl } from '../utils/whatsapp';
+import { formatPrice, generateWhatsAppOrderUrl, openWhatsAppUrl } from '../utils/whatsapp';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -100,14 +100,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         const response = await fetch('/api/upload-receipt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: dataUrl }),
+          body: JSON.stringify({
+            imageBase64: dataUrl,
+            clientOrigin: typeof window !== 'undefined' ? window.location.origin : '',
+          }),
         });
         if (response.ok) {
           const resData = await response.json();
-          if (resData.receiptUrl) {
+          const liveReceiptUrl = resData.receiptUrl || (resData.id ? `${window.location.origin}/api/receipts/${resData.id}` : undefined);
+          if (liveReceiptUrl) {
             setCustomerInfo((prev) => ({
               ...prev,
-              expressReceiptUrl: resData.receiptUrl,
+              expressReceiptUrl: liveReceiptUrl,
             }));
           }
         }
@@ -134,7 +138,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const handleCheckoutWhatsApp = () => {
     if (items.length === 0) return;
     const url = generateWhatsAppOrderUrl(items, totalAmount, config, customerInfo);
-    window.open(url, '_blank');
+    openWhatsAppUrl(url);
   };
 
   const handleCopySummary = () => {

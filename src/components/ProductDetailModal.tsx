@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, MessageCircle, Check, Shield, Truck, RotateCcw } from 'lucide-react';
 import { Product, ProductColor, StoreConfig } from '../types';
-import { formatPrice, generateDirectProductWhatsAppUrl } from '../utils/whatsapp';
+import { formatPrice, generateDirectProductWhatsAppUrl, openWhatsAppUrl } from '../utils/whatsapp';
 import { BrandLogo } from './BrandLogo';
 
 interface ProductDetailModalProps {
@@ -65,7 +65,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       product.price * quantity,
       config
     );
-    window.open(url, '_blank');
+    openWhatsAppUrl(url);
   };
 
   return (

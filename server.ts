@@ -280,11 +280,17 @@ async function startServer() {
 
   // --- Comprovativo de Pagamento (Upload & Acesso Online) ---
   const receiptStore = new Map<string, { buffer: Buffer; mimeType: string; createdAt: number }>();
+  const receiptsDir = path.join(process.cwd(), "public", "receipts");
+  if (!fs.existsSync(receiptsDir)) {
+    try {
+      fs.mkdirSync(receiptsDir, { recursive: true });
+    } catch {}
+  }
 
   // 1. Upload do comprovativo em base64 com geração de link online para WhatsApp
   app.post("/api/upload-receipt", express.json({ limit: "20mb" }), (req, res) => {
     try {
-      const { imageBase64 } = req.body;
+      const { imageBase64, clientOrigin } = req.body;
       if (!imageBase64) {
         return res.status(400).json({ error: "Comprovativo não fornecido" });
       }
@@ -300,6 +306,7 @@ async function startServer() {
         buffer = Buffer.from(imageBase64, "base64");
       }
 
+      const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
       const receiptId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       receiptStore.set(receiptId, {
         buffer,
@@ -307,12 +314,27 @@ async function startServer() {
         createdAt: Date.now(),
       });
 
-      const host = req.get("host") || "localhost:3000";
-      const isHttps = req.secure || req.get("x-forwarded-proto") === "https";
-      const protocol = isHttps ? "https" : "http";
-      const receiptUrl = `${protocol}://${host}/api/receipts/${receiptId}`;
+      // Persistir em disco para sobrevivência ao reiniciar o servidor
+      try {
+        const filePath = path.join(receiptsDir, `${receiptId}.${ext}`);
+        fs.writeFileSync(filePath, buffer);
+      } catch (saveErr) {
+        console.warn("Could not persist receipt to disk:", saveErr);
+      }
 
-      console.log(`[Comprovativo] Novo comprovativo guardado com sucesso: ${receiptId}`);
+      // Determinar o URL público correto
+      let baseUrl = "";
+      if (typeof clientOrigin === "string" && clientOrigin.startsWith("http")) {
+        baseUrl = clientOrigin.replace(/\/+$/, "");
+      } else {
+        const host = req.get("x-forwarded-host") || req.get("host") || "localhost:3000";
+        const isHttps = req.secure || req.get("x-forwarded-proto") === "https";
+        const protocol = isHttps ? "https" : "http";
+        baseUrl = `${protocol}://${host}`;
+      }
+      const receiptUrl = `${baseUrl}/api/receipts/${receiptId}`;
+
+      console.log(`[Comprovativo] Novo comprovativo guardado com sucesso: ${receiptId} (${receiptUrl})`);
 
       return res.json({
         success: true,
@@ -329,12 +351,35 @@ async function startServer() {
   app.get("/api/receipts/:id", (req, res) => {
     const { id } = req.params;
     const item = receiptStore.get(id);
-    if (!item) {
-      return res.status(404).send("Comprovativo não encontrado.");
+    if (item) {
+      res.setHeader("Content-Type", item.mimeType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.send(item.buffer);
     }
-    res.setHeader("Content-Type", item.mimeType);
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    return res.send(item.buffer);
+
+    // Fallback do disco
+    try {
+      const candidates = [
+        path.join(receiptsDir, `${id}.jpg`),
+        path.join(receiptsDir, `${id}.jpeg`),
+        path.join(receiptsDir, `${id}.png`),
+        path.join(receiptsDir, `${id}.webp`),
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          const buf = fs.readFileSync(candidate);
+          const ext = path.extname(candidate).toLowerCase();
+          const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+          res.setHeader("Content-Type", mime);
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          return res.send(buf);
+        }
+      }
+    } catch (diskErr) {
+      console.warn("Error reading receipt from disk:", diskErr);
+    }
+
+    return res.status(404).send("Comprovativo não encontrado.");
   });
 
   // Vite middleware for development

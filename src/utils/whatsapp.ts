@@ -98,3 +98,15 @@ export function generateDirectProductWhatsAppUrl(
 
   return `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodeURIComponent(text)}`;
 }
+
+export function openWhatsAppUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      window.location.href = url;
+    }
+  } catch {
+    window.location.href = url;
+  }
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Check, Eye, MessageCircle, Sparkles, Star } from 'lucide-react';
 import { Product, ProductColor, StoreConfig } from '../types';
-import { formatPrice, generateDirectProductWhatsAppUrl } from '../utils/whatsapp';
+import { formatPrice, generateDirectProductWhatsAppUrl, openWhatsAppUrl } from '../utils/whatsapp';
 
 interface ProductCardProps {
   product: Product;
@@ -58,7 +58,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       product.price,
       config
     );
-    window.open(url, '_blank');
+    openWhatsAppUrl(url);
   };
 
   return (
