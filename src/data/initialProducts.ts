@@ -1,23 +1,4 @@
-import { Product, StoreConfig, CategoryItem } from "../types";
-
-export const DEFAULT_CATEGORIES: CategoryItem[] = [
-  {
-    "id": "tshirts",
-    "name": "T-shirts & Oversized"
-  },
-  {
-    "id": "chapeus",
-    "name": "Chapéus & Bonés"
-  },
-  {
-    "id": "hoodies",
-    "name": "Moletom & Hoodies"
-  },
-  {
-    "id": "regadas",
-    "name": "Regata"
-  }
-];
+import { Product, StoreConfig } from "../types";
 
 export const DEFAULT_STORE_CONFIG: StoreConfig = {
   "storeName": "STRONG",
@@ -26,7 +7,7 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
   "countryCode": "+244",
   "currencySymbol": "Kz",
   "currencyPosition": "suffix",
-  "welcomeMessage": "",
+  "welcomeMessage": "Olá Strong! Vim através da vossa loja online e gostaria de finalizar a seguinte encomenda:",
   "instagramHandle": "@strong.brand",
   "address": "Luanda, Angola | Entregas para todo o país",
   "adminPassword": "admin",
