@@ -100,6 +100,29 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // CORS middleware - allow requests from any origin (including external browser tabs, mobile devices, and previews)
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
+  // Ensure public, uploads, and receipts directories exist
+  const publicDir = path.join(process.cwd(), "public");
+  const uploadsDir = path.join(publicDir, "uploads");
+  const receiptsDir = path.join(publicDir, "receipts");
+  try {
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    if (!fs.existsSync(receiptsDir)) fs.mkdirSync(receiptsDir, { recursive: true });
+  } catch {}
+
+  // Serve static files from public (for uploaded product photos, receipts, catalog.json)
+  app.use(express.static(publicDir));
+
   // Increase payload limit to support images uploaded as base64
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -199,9 +222,6 @@ async function startServer() {
       // Save to public/catalog.json
       fs.writeFileSync(catalogFilePath, JSON.stringify(productsList, null, 2), "utf-8");
 
-      // Synchronize src/data/initialProducts.ts so GitHub code repository updates as well
-      syncSourceCodeFiles(productsList, undefined);
-
       // In production mode, also save to dist/catalog.json if dist exists
       const distCatalogPath = path.join(process.cwd(), "dist", "catalog.json");
       if (fs.existsSync(path.join(process.cwd(), "dist"))) {
@@ -232,6 +252,82 @@ async function startServer() {
     }
   });
 
+  // Upload product image to disk to avoid storing heavy base64 strings in JSON/localStorage
+  app.post("/api/upload-image", express.json({ limit: "25mb" }), (req, res) => {
+    try {
+      const { imageBase64, clientOrigin } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Imagem não fornecida" });
+      }
+
+      // If already a URL, return as-is
+      if (typeof imageBase64 === "string" && (imageBase64.startsWith("http://") || imageBase64.startsWith("https://") || imageBase64.startsWith("/uploads/"))) {
+        return res.json({ success: true, url: imageBase64 });
+      }
+
+      const matches = imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      let mimeType = "image/jpeg";
+      let buffer: Buffer;
+
+      if (matches && matches.length === 3) {
+        mimeType = matches[1];
+        buffer = Buffer.from(matches[2], "base64");
+      } else {
+        buffer = Buffer.from(imageBase64, "base64");
+      }
+
+      const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
+      const imageId = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const fileName = `${imageId}.${ext}`;
+      const filePath = path.join(uploadsDir, fileName);
+      fs.writeFileSync(filePath, buffer);
+
+      // In production mode, also save to dist/uploads if dist exists
+      const distUploadsDir = path.join(process.cwd(), "dist", "uploads");
+      if (fs.existsSync(distUploadsDir)) {
+        try {
+          fs.writeFileSync(path.join(distUploadsDir, fileName), buffer);
+        } catch {}
+      }
+
+      const relativeUrl = `/uploads/${fileName}`;
+
+      // Determinar o URL público correto
+      let baseUrl = "";
+      if (typeof clientOrigin === "string" && clientOrigin.startsWith("http")) {
+        baseUrl = clientOrigin.replace(/\/+$/, "");
+      } else {
+        const host = req.get("x-forwarded-host") || req.get("host") || "localhost:3000";
+        const isHttps = req.secure || req.get("x-forwarded-proto") === "https";
+        const protocol = isHttps ? "https" : "http";
+        baseUrl = `${protocol}://${host}`;
+      }
+      const absoluteUrl = `${baseUrl}${relativeUrl}`;
+
+      console.log(`[Upload] Imagem do produto guardada: ${fileName} (${relativeUrl})`);
+
+      return res.json({
+        success: true,
+        id: imageId,
+        url: relativeUrl,
+        absoluteUrl,
+      });
+    } catch (err) {
+      console.error("Error uploading product image:", err);
+      return res.status(500).json({ error: "Falha ao gravar imagem do produto" });
+    }
+  });
+
+  // Manual export of source code files (optional, for GitHub commits)
+  app.post("/api/export-initial-products", (req, res) => {
+    try {
+      syncSourceCodeFiles();
+      return res.json({ success: true, message: "src/data/initialProducts.ts sincronizado com sucesso!" });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || "Falha ao sincronizar código-fonte" });
+    }
+  });
+
   app.get("/api/config", (req, res) => {
     try {
       if (fs.existsSync(configFilePath)) {
@@ -255,9 +351,6 @@ async function startServer() {
 
       fs.writeFileSync(configFilePath, JSON.stringify(newConfig, null, 2), "utf-8");
 
-      // Synchronize src/data/initialProducts.ts so GitHub code repository updates as well
-      syncSourceCodeFiles(undefined, newConfig);
-
       // In production mode, also write to dist/config.json
       const distConfigPath = path.join(process.cwd(), "dist", "config.json");
       if (fs.existsSync(path.join(process.cwd(), "dist"))) {
@@ -280,12 +373,6 @@ async function startServer() {
 
   // --- Comprovativo de Pagamento (Upload & Acesso Online) ---
   const receiptStore = new Map<string, { buffer: Buffer; mimeType: string; createdAt: number }>();
-  const receiptsDir = path.join(process.cwd(), "public", "receipts");
-  if (!fs.existsSync(receiptsDir)) {
-    try {
-      fs.mkdirSync(receiptsDir, { recursive: true });
-    } catch {}
-  }
 
   // 1. Upload do comprovativo em base64 com geração de link online para WhatsApp
   app.post("/api/upload-receipt", express.json({ limit: "20mb" }), (req, res) => {
@@ -349,6 +436,7 @@ async function startServer() {
 
   // 2. Servir imagem do comprovativo
   app.get("/api/receipts/:id", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     const { id } = req.params;
     const item = receiptStore.get(id);
     if (item) {

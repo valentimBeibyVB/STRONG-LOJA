@@ -12,17 +12,23 @@ export function formatPrice(amount: number, config: StoreConfig): string {
   return `${formatted} ${config.currencySymbol}`;
 }
 
-export function generateWhatsAppOrderUrl(
+export function generateWhatsAppOrderText(
   items: CartItem[],
   totalAmount: number,
   config: StoreConfig,
   customer?: CheckoutCustomerInfo
 ): string {
-  const cleanedPhone = config.whatsappNumber.replace(/\D/g, '');
   const orderId = `STR-${Math.floor(1000 + Math.random() * 9000)}`;
 
   let text = `🔥 *NOVA ENCOMENDA STRONG — #${orderId}*\n\n`;
-  text += `${config.welcomeMessage}\n\n`;
+  if (
+    config.welcomeMessage &&
+    config.welcomeMessage.trim() &&
+    !config.welcomeMessage.includes('Vim através da vossa loja online e gostaria de finalizar a seguinte encomenda') &&
+    !config.welcomeMessage.includes('Olá Strong! Vim através da vossa loja online')
+  ) {
+    text += `${config.welcomeMessage.trim()}\n\n`;
+  }
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `🛒 *PRODUTOS ESCOLHIDOS:*\n\n`;
 
@@ -51,15 +57,10 @@ export function generateWhatsAppOrderUrl(
       text += `• *Forma de Pagamento:* ${customer.paymentMethod}\n`;
       if (customer.paymentMethod.includes('Multicaixa Express')) {
         if (customer.expressSenderPhone?.trim()) {
-          text += `• *Telemóvel do Envio (Express):* ${customer.expressSenderPhone.trim()}\n`;
+          text += `• *Telemóvel que Enviou (Express):* ${customer.expressSenderPhone.trim()}\n`;
         }
         if (customer.expressSenderName?.trim()) {
           text += `• *Nome do Titular que Enviou:* ${customer.expressSenderName.trim()}\n`;
-        }
-        if (customer.expressReceiptUrl?.trim()) {
-          text += `📸 *Comprovativo (Ver Online):* ${customer.expressReceiptUrl.trim()}\n`;
-        } else if (customer.expressReceiptPreview) {
-          text += `📸 *Comprovativo de Pagamento:* Anexado a esta conversa\n`;
         }
       }
     }
@@ -70,13 +71,25 @@ export function generateWhatsAppOrderUrl(
   }
 
   if (customer?.paymentMethod?.includes('Multicaixa Express')) {
-    text += `⚡ *Pagamento feito via Multicaixa Express (Enviar Dinheiro) para ${config.expressAccountHolder || 'Strong Africa'}. Comprovativo disponível para conferência imediata!*`;
+    const expressTargetPhone = (config.expressPhoneNumber || '944986967').trim();
+    text += `Faça o seu pagamento via Multicaixa Express para ${expressTargetPhone}, e manda o seu comprovativo aqui para confirmamos a encomenda.`;
   } else if (customer?.paymentMethod === 'Pagar no Local') {
     text += `📍 *Pagamento no Local escolhido (Dinheiro na entrega). Aguardo confirmação e despacho da encomenda!*`;
   } else {
     text += `📍 *Aguardo confirmação de disponibilidade e dados para finalização da encomenda.*`;
   }
 
+  return text;
+}
+
+export function generateWhatsAppOrderUrl(
+  items: CartItem[],
+  totalAmount: number,
+  config: StoreConfig,
+  customer?: CheckoutCustomerInfo
+): string {
+  const cleanedPhone = config.whatsappNumber.replace(/\D/g, '');
+  const text = generateWhatsAppOrderText(items, totalAmount, config, customer);
   const encodedMessage = encodeURIComponent(text);
   return `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`;
 }

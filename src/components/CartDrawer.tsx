@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Trash2,
@@ -11,15 +11,16 @@ import {
   MapPin,
   FileText,
   Smartphone,
-  Upload,
-  Image as ImageIcon,
-  CheckCircle2,
   ShieldCheck,
   Info,
-  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { CartItem, CheckoutCustomerInfo, StoreConfig } from '../types';
-import { formatPrice, generateWhatsAppOrderUrl, openWhatsAppUrl } from '../utils/whatsapp';
+import {
+  formatPrice,
+  generateWhatsAppOrderUrl,
+  openWhatsAppUrl,
+} from '../utils/whatsapp';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -48,8 +49,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     paymentMethod: 'Multicaixa Express',
     expressSenderPhone: '',
     expressSenderName: '',
-    expressReceiptPreview: undefined,
-    expressReceiptUrl: undefined,
   });
 
   const [showCustomerForm, setShowCustomerForm] = useState(true);
@@ -57,17 +56,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [copiedExpressPhone, setCopiedExpressPhone] = useState(false);
   const [copiedExpressIban, setCopiedExpressIban] = useState(false);
   const [showIbanDetails, setShowIbanDetails] = useState(false);
-  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
-
-  const receiptFileInputRef = useRef<HTMLInputElement>(null);
+  const [expressPhoneError, setExpressPhoneError] = useState<string | null>(null);
+  const [showPhoneConfirmModal, setShowPhoneConfirmModal] = useState(false);
 
   if (!isOpen) return null;
 
   const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const expressPhone = (config.expressPhoneNumber || config.whatsappNumber || '953488842').trim();
-  const expressHolder = (config.expressAccountHolder || 'Strong Africa').trim();
+  const expressPhone = (config.expressPhoneNumber || '944986967').trim();
+  const expressHolder = (config.expressAccountHolder || 'GILBERTO LOURENÇO GOLAMBOLE').trim();
 
   const handleCopyExpressPhone = () => {
     navigator.clipboard.writeText(expressPhone.replace(/\s+/g, ''));
@@ -82,62 +80,37 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     setTimeout(() => setCopiedExpressIban(false), 2000);
   };
 
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploadingReceipt(true);
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const dataUrl = event.target?.result as string;
-      setCustomerInfo((prev) => ({
-        ...prev,
-        expressReceiptPreview: dataUrl,
-      }));
-
-      // Automatically upload to backend to create an online link for WhatsApp
-      try {
-        const response = await fetch('/api/upload-receipt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: dataUrl,
-            clientOrigin: typeof window !== 'undefined' ? window.location.origin : '',
-          }),
-        });
-        if (response.ok) {
-          const resData = await response.json();
-          const liveReceiptUrl = resData.receiptUrl || (resData.id ? `${window.location.origin}/api/receipts/${resData.id}` : undefined);
-          if (liveReceiptUrl) {
-            setCustomerInfo((prev) => ({
-              ...prev,
-              expressReceiptUrl: liveReceiptUrl,
-            }));
-          }
-        }
-      } catch (uploadErr) {
-        console.warn('Erro ao carregar comprovativo para o servidor:', uploadErr);
-      } finally {
-        setIsUploadingReceipt(false);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveReceipt = () => {
-    setCustomerInfo((prev) => ({
-      ...prev,
-      expressReceiptPreview: undefined,
-      expressReceiptUrl: undefined,
-    }));
-    if (receiptFileInputRef.current) {
-      receiptFileInputRef.current.value = '';
-    }
-  };
-
-  const handleCheckoutWhatsApp = () => {
+  const handleInitiateCheckout = () => {
     if (items.length === 0) return;
+
+    if (isExpressSelected) {
+      const rawNumber = (customerInfo.expressSenderPhone || '').trim();
+      const digitsOnly = rawNumber.replace(/\D/g, '');
+
+      if (!digitsOnly || digitsOnly.length < 9) {
+        setExpressPhoneError('O número de telemóvel do Express é obrigatório (mínimo 9 dígitos).');
+        setShowCustomerForm(true);
+        setTimeout(() => {
+          const input = document.getElementById('express-sender-phone-input');
+          if (input) {
+            input.focus();
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 50);
+        return;
+      }
+
+      setExpressPhoneError(null);
+      setShowPhoneConfirmModal(true);
+      return;
+    }
+
+    executeWhatsAppCheckout();
+  };
+
+  const executeWhatsAppCheckout = () => {
     const url = generateWhatsAppOrderUrl(items, totalAmount, config, customerInfo);
+    setShowPhoneConfirmModal(false);
     openWhatsAppUrl(url);
   };
 
@@ -546,19 +519,46 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           </div>
 
                           {/* Dados de validação do cliente */}
-                          <div className="space-y-2.5 pt-1 border-t border-neutral-800/80">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="space-y-3 pt-2 border-t border-neutral-800/80">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                               <div>
-                                <label className="block text-[11px] text-neutral-300 font-medium mb-1">
-                                  Telemóvel que Enviou (Express):
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label htmlFor="express-sender-phone-input" className="block text-[11px] text-neutral-300 font-bold">
+                                    Telemóvel que Enviou (Express) <span className="text-red-400">*</span>
+                                  </label>
+                                  <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
+                                    Obrigatório
+                                  </span>
+                                </div>
                                 <input
+                                  id="express-sender-phone-input"
                                   type="tel"
                                   placeholder="Ex: 923 xxx xxx"
                                   value={customerInfo.expressSenderPhone || ''}
-                                  onChange={(e) => setCustomerInfo({ ...customerInfo, expressSenderPhone: e.target.value })}
-                                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-md text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-400"
+                                  onChange={(e) => {
+                                    setCustomerInfo({ ...customerInfo, expressSenderPhone: e.target.value });
+                                    if (expressPhoneError) setExpressPhoneError(null);
+                                  }}
+                                  className={`w-full px-3 py-2 bg-neutral-900 border rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none transition ${
+                                    expressPhoneError
+                                      ? 'border-red-500 ring-2 ring-red-500/30 bg-red-950/20'
+                                      : 'border-neutral-800 focus:border-emerald-400'
+                                  }`}
                                 />
+                                {expressPhoneError ? (
+                                  <div className="flex items-center gap-1.5 text-[11px] text-red-400 font-medium pt-1">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{expressPhoneError}</span>
+                                  </div>
+                                ) : customerInfo.phone && !customerInfo.expressSenderPhone ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomerInfo({ ...customerInfo, expressSenderPhone: customerInfo.phone })}
+                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 underline pt-1 block text-left"
+                                  >
+                                    Usar o meu número de contacto ({customerInfo.phone})
+                                  </button>
+                                ) : null}
                               </div>
 
                               <div>
@@ -570,70 +570,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                   placeholder="Nome da tua conta"
                                   value={customerInfo.expressSenderName || ''}
                                   onChange={(e) => setCustomerInfo({ ...customerInfo, expressSenderName: e.target.value })}
-                                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-md text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-400"
+                                  className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-400"
                                 />
                               </div>
                             </div>
 
-                            {/* Anexo de Comprovativo / Print */}
-                            <div>
-                              <input
-                                type="file"
-                                ref={receiptFileInputRef}
-                                onChange={handleReceiptUpload}
-                                accept="image/*"
-                                className="hidden"
-                              />
-                              
-                              {!customerInfo.expressReceiptPreview ? (
-                                <button
-                                  type="button"
-                                  onClick={() => receiptFileInputRef.current?.click()}
-                                  disabled={isUploadingReceipt}
-                                  className="w-full py-2.5 px-3 rounded-lg border border-dashed border-emerald-500/40 hover:border-emerald-400 bg-neutral-900/60 hover:bg-neutral-900 text-neutral-200 hover:text-white text-xs font-semibold transition flex items-center justify-center gap-2 group"
-                                >
-                                  {isUploadingReceipt ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
-                                      <span className="text-emerald-400">A processar imagem do comprovativo...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Upload className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition" />
-                                      <span>Anexar Comprovativo ou Print (Vai no WhatsApp)</span>
-                                    </>
-                                  )}
-                                </button>
-                              ) : (
-                                <div className="p-2.5 rounded-lg bg-neutral-900 border border-emerald-500/60 flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2.5 overflow-hidden">
-                                    <img
-                                      src={customerInfo.expressReceiptPreview}
-                                      alt="Comprovativo"
-                                      className="w-10 h-10 rounded object-cover border border-emerald-500/40 shrink-0"
-                                    />
-                                    <div className="truncate">
-                                      <span className="text-[11px] font-bold text-emerald-400 block truncate flex items-center gap-1.5">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 inline" />
-                                        Comprovativo Anexado com Sucesso!
-                                      </span>
-                                      <span className="text-[10px] text-neutral-400 block truncate">
-                                        {customerInfo.expressReceiptUrl
-                                          ? 'Link direto gerado para envio no WhatsApp'
-                                          : 'Pronto para validação no WhatsApp'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={handleRemoveReceipt}
-                                    className="p-1 text-neutral-400 hover:text-red-400 rounded transition shrink-0"
-                                    title="Remover comprovativo"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
+                            {/* Informação sobre validação do número */}
+                            <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 flex items-start gap-2">
+                              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                              <p className="text-[11px] text-emerald-300/90 leading-relaxed">
+                                Insere o número de telemóvel que utilizaste no Multicaixa Express. Antes de concluir a encomenda, terás de confirmar este número para validação da compra.
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -680,7 +627,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               {/* Primary Action Button */}
               <button
                 id="cart-checkout-whatsapp-btn"
-                onClick={handleCheckoutWhatsApp}
+                onClick={handleInitiateCheckout}
                 className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg transition transform active:scale-98 ${
                   isExpressSelected
                     ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-emerald-500/25'
@@ -690,9 +637,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <MessageCircle className="w-5 h-5 fill-neutral-950 shrink-0" />
                 <span className="truncate">
                   {isExpressSelected
-                    ? customerInfo.expressReceiptPreview
-                      ? 'Enviar Comprovativo & Finalizar no WhatsApp'
-                      : 'Finalizar no WhatsApp (Multicaixa Express)'
+                    ? 'Finalizar no WhatsApp (Multicaixa Express)'
                     : isPagarNoLocal
                     ? 'Confirmar Pedido (Pagar no Local)'
                     : 'Finalizar Compra no WhatsApp'}
@@ -723,6 +668,85 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           )}
         </aside>
       </div>
+
+      {/* Modal / Dialog de Confirmação do Número Express */}
+      {showPhoneConfirmModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-sm bg-neutral-900 border border-emerald-500/50 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 text-center">
+            {/* Header Icon */}
+            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-md">
+              <Smartphone className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+                <ShieldCheck className="w-3.5 h-3.5" /> Confirmação Obrigatória
+              </div>
+              <h3 className="text-lg font-black text-white font-['Cabinet_Grotesk',sans-serif]">
+                Confirma o teu Número Express
+              </h3>
+              <p className="text-xs text-neutral-300 leading-relaxed">
+                Por favor, certifica-te de que realizaste o envio do dinheiro através deste número:
+              </p>
+            </div>
+
+            {/* Número em grande destaque */}
+            <div className="p-3.5 rounded-xl bg-neutral-950 border border-emerald-500/40 space-y-1">
+              <span className="text-[10px] text-neutral-400 uppercase tracking-widest block font-medium">
+                Telemóvel do Envio (Express)
+              </span>
+              <span className="text-xl font-mono font-black text-emerald-400 tracking-wider block">
+                {customerInfo.expressSenderPhone}
+              </span>
+              {customerInfo.expressSenderName && (
+                <span className="text-xs text-neutral-300 block">
+                  Titular: <strong>{customerInfo.expressSenderName}</strong>
+                </span>
+              )}
+              <div className="text-[11px] text-neutral-400 pt-1.5 border-t border-neutral-800 flex justify-between">
+                <span>Total a validar:</span>
+                <span className="font-bold text-amber-400">{formatPrice(totalAmount, config)}</span>
+              </div>
+            </div>
+
+            {/* Aviso de segurança */}
+            <div className="p-2.5 rounded-lg bg-neutral-950/80 border border-neutral-800 text-left text-[11px] text-neutral-300 space-y-1">
+              <span className="font-bold text-emerald-400 block flex items-center gap-1">
+                <Info className="w-3.5 h-3.5" /> Atenção para validação rápida:
+              </span>
+              <p className="text-neutral-400 text-[10px] leading-relaxed">
+                O operador só poderá validar o pagamento e despachar a encomenda se o número de envio estiver correto. Só com este número confirmado a tua encomenda poderá ser concluída.
+              </p>
+            </div>
+
+            {/* Botões de Decisão */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                id="confirm-express-phone-btn"
+                onClick={executeWhatsAppCheckout}
+                className="w-full py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition transform active:scale-98"
+              >
+                <MessageCircle className="w-4 h-4 fill-neutral-950" />
+                <span>Sim, Confirmar e Fazer Encomenda</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhoneConfirmModal(false);
+                  setTimeout(() => {
+                    document.getElementById('express-sender-phone-input')?.focus();
+                  }, 100);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs transition"
+              >
+                Corrigir / Alterar Número
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

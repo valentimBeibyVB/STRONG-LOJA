@@ -19,16 +19,10 @@ export default function App() {
   // 1. Storage & Persistence (Client-side localStorage suitable for GitHub Pages / static hosting)
   const [products, setProducts] = useState<Product[]>(() => {
     try {
-      const isCleaned = localStorage.getItem('strong_catalog_zero_v3');
-      if (!isCleaned) {
-        localStorage.removeItem('strong_products');
-        localStorage.setItem('strong_catalog_zero_v3', 'true');
-        return [];
-      }
       const saved = localStorage.getItem('strong_products');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {
       console.error('Error loading stored products:', e);
@@ -189,10 +183,10 @@ export default function App() {
         details: 'Servidor indisponível ou site rodando estático. Modificações salvas localmente no navegador.',
       });
     } finally {
-      // Keep isSavingRef locked briefly to avoid echo race
+      // Keep isSavingRef locked for 3.5 seconds to avoid echo race or polling clobber
       setTimeout(() => {
         isSavingRef.current = false;
-      }, 1200);
+      }, 3500);
     }
     return false;
   };
@@ -306,8 +300,15 @@ export default function App() {
           const serverVer = typeof json.version === 'number' ? json.version : 0;
 
           setProducts((currentProducts) => {
+            // Never overwrite if user has newer or local changes that are newer than server version
+            if (!force && serverVer > 0 && serverVer < localCatalogVersionRef.current) {
+              return currentProducts;
+            }
             const isDifferent = JSON.stringify(currentProducts) !== JSON.stringify(json.products);
-            if (force || isDifferent || (serverVer > 0 && serverVer !== localCatalogVersionRef.current)) {
+            if (force || (serverVer > 0 && serverVer > localCatalogVersionRef.current) || (currentProducts.length === 0 && json.products.length > 0)) {
+              return json.products;
+            }
+            if (isDifferent && serverVer === localCatalogVersionRef.current && !isSavingRef.current) {
               return json.products;
             }
             return currentProducts;
@@ -547,15 +548,14 @@ export default function App() {
           const statusJson = await res.json();
           const serverVer = typeof statusJson.version === 'number' ? statusJson.version : 0;
           const localVer = typeof localCatalogVersionRef.current === 'number' ? localCatalogVersionRef.current : 0;
-          if (serverVer !== localVer || localVer === 0) {
+          if (serverVer > localVer || (localVer === 0 && serverVer > 0)) {
             fetchLatestCatalog(true, true);
           }
           return;
         }
       } catch {
-        // Server not available, fall back to static check
+        // Server not available
       }
-      fetchLatestCatalog(false, true);
     };
 
     const handleActive = () => {

@@ -361,6 +361,30 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
+  // Upload image to server to keep URLs lightweight and prevent quota issues
+  const uploadProductImageToServer = async (base64: string): Promise<string> => {
+    if (!base64 || !base64.startsWith('data:image/')) return base64;
+    try {
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64,
+          clientOrigin: typeof window !== 'undefined' ? window.location.origin : '',
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.url) {
+          return json.url;
+        }
+      }
+    } catch (e) {
+      console.warn('Image upload to server fallback to base64:', e);
+    }
+    return base64;
+  };
+
   // Color file upload with canvas compression
   const handleColorFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -396,10 +420,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         if (targetColorIndexForUpload === -1) {
           setNewColorImage(dataUrl);
+          uploadProductImageToServer(dataUrl).then((url) => {
+            if (url && url !== dataUrl) setNewColorImage(url);
+          });
         } else if (targetColorIndexForUpload !== null && targetColorIndexForUpload >= 0) {
+          const targetIdx = targetColorIndexForUpload;
           setFormColors((prev) =>
-            prev.map((c, idx) => (idx === targetColorIndexForUpload ? { ...c, image: dataUrl } : c))
+            prev.map((c, idx) => (idx === targetIdx ? { ...c, image: dataUrl } : c))
           );
+          uploadProductImageToServer(dataUrl).then((url) => {
+            if (url && url !== dataUrl) {
+              setFormColors((prev) =>
+                prev.map((c, idx) => (idx === targetIdx ? { ...c, image: url } : c))
+              );
+            }
+          });
         }
         setTargetColorIndexForUpload(null);
       };
@@ -507,8 +542,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         ctx?.drawImage(img, 0, 0, Math.round(width), Math.round(height));
 
         // Convert to jpeg data url with efficient compression
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         setFormImage(dataUrl);
+
+        // Upload to server to get persistent lightweight URL and avoid quota limits
+        uploadProductImageToServer(dataUrl).then((url) => {
+          if (url && url !== dataUrl) {
+            setFormImage(url);
+          }
+        });
       };
       img.src = event.target?.result as string;
     };
