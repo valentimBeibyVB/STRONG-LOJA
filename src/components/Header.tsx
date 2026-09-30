@@ -2,6 +2,7 @@ import React from 'react';
 import { ShoppingBag, Shirt, Search, Sparkles } from 'lucide-react';
 import { ProductCategory, StoreConfig } from '../types';
 import { BrandLogo } from './BrandLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   cartCount: number;
@@ -91,7 +92,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* PWA Install Button */}
+            <PWAInstallButton variant="header" />
+
             {/* Shopping Cart Button */}
             <button
               id="cart-drawer-toggle-btn"

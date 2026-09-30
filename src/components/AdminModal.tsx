@@ -39,6 +39,7 @@ import { formatPrice } from '../utils/whatsapp';
 import { ActivityLog } from './ActivityLog';
 import { BrandLogo } from './BrandLogo';
 import { OrdersManager } from './OrdersManager';
+import { PWAInstallModal } from './PWAInstallModal';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -98,6 +99,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'new' | 'featured' | 'categories' | 'settings' | 'github' | 'logs'>('products');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [showPWAGuide, setShowPWAGuide] = useState(false);
 
   // Categories list
   const currentCategories = useMemo(() => {
@@ -2675,6 +2677,34 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               </div>
 
+              {/* PWA Mobile App Info Card */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-neutral-900 to-neutral-950 border border-neutral-700 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-5 h-5 text-amber-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Aplicativo Móvel para iPhone & Android (PWA)
+                    </h4>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                    App Ativo
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  A loja está configurada com Progressive Web App (PWA). Qualquer cliente com iPhone ou Android pode instalar o aplicativo da <strong className="text-white">STRONG</strong> com 1 clique, abrindo em ecrã inteiro sem barra de navegador e com carregamento instantâneo.
+                </p>
+                <div className="pt-1 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPWAGuide(true)}
+                    className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center gap-2 transition shadow-md shadow-amber-400/20"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    Ver Guia de Instalação (iPhone & Android)
+                  </button>
+                </div>
+              </div>
+
               <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Download className="w-4 h-4 text-amber-400" />
@@ -2816,6 +2846,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* PWA Mobile App Guide Modal */}
+      <PWAInstallModal
+        isOpen={showPWAGuide}
+        onClose={() => setShowPWAGuide(false)}
+        storeName={config.storeName}
+      />
     </div>
   );
 };

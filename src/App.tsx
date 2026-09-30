@@ -14,6 +14,7 @@ import { ProductDetailModal } from './components/ProductDetailModal';
 import { CartDrawer } from './components/CartDrawer';
 import { AdminModal } from './components/AdminModal';
 import { Footer } from './components/Footer';
+import { PWAInstallButton } from './components/PWAInstallButton';
 
 export default function App() {
   // 1. Storage & Persistence (Client-side localStorage suitable for GitHub Pages / static hosting)
@@ -1232,6 +1233,9 @@ export default function App() {
           WhatsApp Strong
         </span>
       </a>
+
+      {/* Floating PWA Install App Trigger Button for Mobile Visitors */}
+      <PWAInstallButton variant="floating" />
 
       {/* Floating Scroll-to-Top Button */}
       {showScrollTop && (

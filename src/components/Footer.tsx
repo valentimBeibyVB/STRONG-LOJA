@@ -1,7 +1,8 @@
 import React from 'react';
-import { MessageCircle, Instagram, Github, Heart, Lock } from 'lucide-react';
+import { MessageCircle, Instagram, Github, Heart, Lock, Smartphone } from 'lucide-react';
 import { StoreConfig } from '../types';
 import { BrandLogo } from './BrandLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface FooterProps {
   config: StoreConfig;
@@ -57,6 +58,12 @@ export const Footer: React.FC<FooterProps> = ({ config, onOpenAdmin }) => {
                   <Instagram className="w-4 h-4" />
                 </a>
               )}
+
+              {/* Install PWA Button */}
+              <PWAInstallButton
+                variant="banner"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-400 hover:text-amber-300 border border-neutral-800 hover:border-amber-400/40 text-xs font-bold transition"
+              />
             </div>
           </div>
 
