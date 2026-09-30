@@ -32,11 +32,13 @@ import {
   Sparkles,
   Layers,
   Tag,
+  ClipboardList,
 } from 'lucide-react';
-import { Product, ProductColor, StoreConfig, SyncLogEntry } from '../types';
+import { Product, ProductColor, StoreConfig, SyncLogEntry, Order, OrderStatus } from '../types';
 import { formatPrice } from '../utils/whatsapp';
 import { ActivityLog } from './ActivityLog';
 import { BrandLogo } from './BrandLogo';
+import { OrdersManager } from './OrdersManager';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -54,6 +56,10 @@ interface AdminModalProps {
   syncLogs?: SyncLogEntry[];
   onClearSyncLogs?: () => void;
   catalogVersion?: number;
+  orders?: Order[];
+  onUpdateOrderStatus?: (orderId: string, newStatus: OrderStatus) => void;
+  onDeleteOrder?: (orderId: string) => void;
+  onDeleteCancelledOrders?: () => void;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -72,6 +78,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   syncLogs = [],
   onClearSyncLogs = () => {},
   catalogVersion,
+  orders = [],
+  onUpdateOrderStatus = () => {},
+  onDeleteOrder = () => {},
+  onDeleteCancelledOrders = () => {},
 }) => {
   // Authentication State (Isolated from customer view)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -86,7 +96,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [showCode, setShowCode] = useState(false);
   const [showAdminPasswordInSettings, setShowAdminPasswordInSettings] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'products' | 'new' | 'featured' | 'categories' | 'settings' | 'github' | 'logs'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'new' | 'featured' | 'categories' | 'settings' | 'github' | 'logs'>('products');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   // Categories list
@@ -933,6 +943,30 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('orders')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'orders'
+              ? 'bg-amber-400 text-neutral-950 shadow-sm font-black'
+              : 'bg-neutral-800/80 text-neutral-300 hover:bg-neutral-800'
+          }`}
+          title="Planilha de controlo e gestão de encomendas dos clientes"
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+          <span>Controlo de Encomendas</span>
+          {orders.length > 0 && (
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'orders'
+                  ? 'bg-neutral-950 text-amber-400'
+                  : 'bg-amber-400 text-neutral-950'
+              }`}
+            >
+              {orders.length}
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => {
             if (activeTab !== 'new') handleResetForm();
             setActiveTab('new');
@@ -1016,6 +1050,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="max-w-6xl mx-auto">
+          {/* TAB: CONTROLO DE ENCOMENDAS (PLANILHA DE PEDIDOS) */}
+          {activeTab === 'orders' && (
+            <OrdersManager
+              orders={orders}
+              config={config}
+              onUpdateStatus={onUpdateOrderStatus}
+              onDeleteOrder={onDeleteOrder}
+              onDeleteCancelledOrders={onDeleteCancelledOrders}
+            />
+          )}
+
           {/* TAB 1: LIST PRODUCTS */}
           {activeTab === 'products' && (
             <div className="space-y-4">

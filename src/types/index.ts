@@ -73,6 +73,35 @@ export interface CheckoutCustomerInfo {
   expressReceiptUrl?: string; // Link para visualização direta do comprovativo no WhatsApp
 }
 
+export type OrderStatus = 'nao_pago' | 'pago' | 'cancelado';
+
+export interface OrderItem {
+  id: string;
+  productId: string;
+  name: string;
+  category?: string;
+  price: number;
+  image?: string;
+  colorName?: string;
+  colorHex?: string;
+  size: string;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  reference: string; // Ex: STR-4821
+  timestamp: number;
+  createdAtFormatted: string; // Ex: "30/09/2026, 10:15"
+  customer: CheckoutCustomerInfo;
+  items: OrderItem[];
+  totalAmount: number;
+  totalQuantity: number;
+  status: OrderStatus;
+  paymentMethod: string;
+  notes?: string;
+}
+
 export type SyncEventType =
   | 'save_products'
   | 'delete_product'

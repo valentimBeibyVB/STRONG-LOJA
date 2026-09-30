@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 const catalogFilePath = path.join(process.cwd(), "public", "catalog.json");
 const configFilePath = path.join(process.cwd(), "public", "config.json");
 const versionFilePath = path.join(process.cwd(), "public", "version.json");
+const ordersFilePath = path.join(process.cwd(), "public", "orders.json");
 const initialProductsFilePath = path.join(process.cwd(), "src", "data", "initialProducts.ts");
 
 function syncSourceCodeFiles(productsList?: any[], configObj?: any) {
@@ -368,6 +369,129 @@ async function startServer() {
     } catch (err) {
       console.error("Error saving config.json:", err);
       return res.status(500).json({ error: "Failed to save config" });
+    }
+  });
+
+  // --- Encomendas & Gestão de Pedidos (Orders API) ---
+  function readOrders(): any[] {
+    try {
+      if (fs.existsSync(ordersFilePath)) {
+        const raw = fs.readFileSync(ordersFilePath, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn("Could not read orders.json:", e);
+    }
+    return [];
+  }
+
+  function saveOrders(ordersList: any[]) {
+    try {
+      fs.writeFileSync(ordersFilePath, JSON.stringify(ordersList, null, 2), "utf-8");
+      const distOrdersPath = path.join(process.cwd(), "dist", "orders.json");
+      if (fs.existsSync(path.join(process.cwd(), "dist"))) {
+        try {
+          fs.writeFileSync(distOrdersPath, JSON.stringify(ordersList, null, 2), "utf-8");
+        } catch {}
+      }
+    } catch (e) {
+      console.warn("Could not save orders.json:", e);
+    }
+  }
+
+  // 1. Obter lista de encomendas
+  app.get("/api/orders", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    return res.json({ orders: readOrders() });
+  });
+
+  // 2. Gravar nova encomenda ou sincronizar lista completa
+  app.post("/api/orders", (req, res) => {
+    try {
+      const incoming = req.body;
+      const current = readOrders();
+      let updated: any[] = [];
+
+      if (Array.isArray(incoming)) {
+        updated = incoming;
+      } else if (incoming && (incoming.id || incoming.reference)) {
+        const idx = current.findIndex(
+          (o) => o.id === incoming.id || o.reference === incoming.reference
+        );
+        if (idx >= 0) {
+          current[idx] = { ...current[idx], ...incoming };
+          updated = current;
+        } else {
+          updated = [incoming, ...current];
+        }
+      } else if (Array.isArray(incoming?.orders)) {
+        updated = incoming.orders;
+      } else {
+        return res.status(400).json({ error: "Dados de encomenda inválidos" });
+      }
+
+      saveOrders(updated);
+      console.log(`[Orders] Total de encomendas guardadas: ${updated.length}`);
+      return res.json({ success: true, count: updated.length, orders: updated });
+    } catch (err) {
+      console.error("Error saving orders:", err);
+      return res.status(500).json({ error: "Falha ao gravar encomenda" });
+    }
+  });
+
+  // 3. Atualizar estado ou dados de um pedido
+  app.put("/api/orders/:id", (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const updates = req.body;
+      const current = readOrders();
+      const idx = current.findIndex((o) => o.id === orderId || o.reference === orderId);
+
+      if (idx >= 0) {
+        current[idx] = { ...current[idx], ...updates };
+        saveOrders(current);
+        return res.json({ success: true, order: current[idx] });
+      }
+      return res.status(404).json({ error: "Encomenda não encontrada" });
+    } catch (err) {
+      console.error("Error updating order:", err);
+      return res.status(500).json({ error: "Falha ao atualizar encomenda" });
+    }
+  });
+
+  // 4. Eliminar uma encomenda
+  app.delete("/api/orders/:id", (req, res) => {
+    try {
+      const orderId = req.params.id;
+      const current = readOrders();
+      const updated = current.filter((o) => o.id !== orderId && o.reference !== orderId);
+      saveOrders(updated);
+      return res.json({ success: true, count: updated.length });
+    } catch (err) {
+      console.error("Error deleting order:", err);
+      return res.status(500).json({ error: "Falha ao eliminar encomenda" });
+    }
+  });
+
+  // 5. Eliminar em massa pedidos cancelados ou não realizados
+  app.post("/api/orders/bulk-delete", (req, res) => {
+    try {
+      const { status } = req.body;
+      const current = readOrders();
+      let updated: any[] = [];
+      if (status === 'cancelados') {
+        updated = current.filter((o) => o.status !== 'cancelado');
+      } else if (status === 'nao_realizados') {
+        updated = current.filter((o) => o.status !== 'cancelado' && o.status !== 'nao_pago');
+      } else {
+        updated = current.filter((o) => o.status !== status);
+      }
+      saveOrders(updated);
+      return res.json({ success: true, count: updated.length });
+    } catch (err) {
+      console.error("Error bulk deleting orders:", err);
+      return res.status(500).json({ error: "Falha ao limpar pedidos" });
     }
   });
 

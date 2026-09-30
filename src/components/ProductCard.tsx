@@ -154,11 +154,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Escolha a cor">
-              {product.colors.map((color) => {
-                const isSelected = selectedColor.name === color.name;
+              {product.colors.map((color, colorIdx) => {
+                const isSelected =
+                  selectedColor === color ||
+                  (selectedColor.name === color.name &&
+                    selectedColor.image === color.image &&
+                    selectedColor.hex === color.hex);
                 return (
                   <button
-                    key={color.name}
+                    key={`${color.name}-${colorIdx}`}
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -198,11 +202,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {product.sizes.map((size) => {
+              {product.sizes.map((size, sizeIdx) => {
                 const isSelected = selectedSize === size;
                 return (
                   <button
-                    key={size}
+                    key={`${size}-${sizeIdx}`}
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();

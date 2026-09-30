@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { MessageCircle, ShoppingBag, Sparkles, Filter, AlertCircle, ArrowUp, Plus } from 'lucide-react';
-import { Product, ProductColor, CartItem, StoreConfig, ProductCategory, SyncLogEntry } from './types';
+import { Product, ProductColor, CartItem, StoreConfig, ProductCategory, SyncLogEntry, Order, OrderStatus } from './types';
 import { INITIAL_PRODUCTS, DEFAULT_STORE_CONFIG } from './data/initialProducts';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
@@ -46,6 +46,20 @@ export default function App() {
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error('Error loading cart:', e);
+    }
+    return [];
+  });
+
+  // 2. Orders Management State (Persisted in localStorage and synced with backend API)
+  const [orders, setOrders] = useState<Order[]>(() => {
+    try {
+      const saved = localStorage.getItem('strong_store_orders');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Error loading stored orders:', e);
     }
     return [];
   });
@@ -105,6 +119,159 @@ export default function App() {
     } catch {
       // ignore
     }
+  };
+
+  // --- Encomendas & Pedidos Handlers ---
+  const fetchLatestOrders = async () => {
+    try {
+      const res = await fetch('/api/orders?t=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.orders)) {
+          setOrders((localOrders) => {
+            const map = new Map<string, Order>();
+            // Add server orders
+            data.orders.forEach((o: Order) => map.set(o.id || o.reference, o));
+            // Keep any local orders not yet on server
+            localOrders.forEach((o) => {
+              const key = o.id || o.reference;
+              if (!map.has(key)) {
+                map.set(key, o);
+              }
+            });
+            const merged = Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
+            try {
+              localStorage.setItem('strong_store_orders', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      }
+    } catch (err) {
+      console.log('Server not reachable for orders API, using localStorage');
+    }
+  };
+
+  const handleCreateOrder = async (newOrder: Order) => {
+    setOrders((prev) => {
+      const updated = [newOrder, ...prev.filter((o) => o.id !== newOrder.id && o.reference !== newOrder.reference)];
+      try {
+        localStorage.setItem('strong_store_orders', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not save order to localStorage:', err);
+      }
+
+      // Broadcast across tabs
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('strong_store_broadcast');
+          channel.postMessage({ type: 'ORDERS_UPDATED', orders: updated });
+          channel.close();
+        }
+      } catch {}
+
+      return updated;
+    });
+
+    addSyncLog(
+      'save_products' as any,
+      `Nova Encomenda #${newOrder.reference}`,
+      'success',
+      'local_storage',
+      { details: `Cliente: ${newOrder.customer.name || 'Sem nome'} • Total: ${newOrder.totalAmount} Kz` }
+    );
+
+    // Persist to backend server if available
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder),
+      });
+    } catch (err) {
+      console.warn('Could not sync order to backend server:', err);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    setOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.id === orderId || o.reference === orderId ? { ...o, status: newStatus } : o
+      );
+      try {
+        localStorage.setItem('strong_store_orders', JSON.stringify(updated));
+      } catch {}
+
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('strong_store_broadcast');
+          channel.postMessage({ type: 'ORDERS_UPDATED', orders: updated });
+          channel.close();
+        }
+      } catch {}
+
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch {}
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    setOrders((prev) => {
+      const updated = prev.filter((o) => o.id !== orderId && o.reference !== orderId);
+      try {
+        localStorage.setItem('strong_store_orders', JSON.stringify(updated));
+      } catch {}
+
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('strong_store_broadcast');
+          channel.postMessage({ type: 'ORDERS_UPDATED', orders: updated });
+          channel.close();
+        }
+      } catch {}
+
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'DELETE',
+      });
+    } catch {}
+  };
+
+  const handleDeleteCancelledOrders = async () => {
+    setOrders((prev) => {
+      const updated = prev.filter((o) => o.status !== 'cancelado');
+      try {
+        localStorage.setItem('strong_store_orders', JSON.stringify(updated));
+      } catch {}
+
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('strong_store_broadcast');
+          channel.postMessage({ type: 'ORDERS_UPDATED', orders: updated });
+          channel.close();
+        }
+      } catch {}
+
+      return updated;
+    });
+
+    try {
+      await fetch('/api/orders/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelados' }),
+      });
+    } catch {}
   };
 
   // References to prevent race conditions during save and focus/polling events
@@ -524,6 +691,10 @@ export default function App() {
         if (event.data.config) {
           setConfig(event.data.config);
         }
+      } else if (event.data?.type === 'ORDERS_UPDATED') {
+        if (Array.isArray(event.data.orders)) {
+          setOrders(event.data.orders);
+        }
       }
     };
 
@@ -534,8 +705,9 @@ export default function App() {
 
   // Multi-device synchronization check: fast polling, window focus, phone screen unlock, and online events
   useEffect(() => {
-    // On initial mount: always fetch latest catalog from server
+    // On initial mount: always fetch latest catalog and orders from server
     fetchLatestCatalog(true, true);
+    fetchLatestOrders();
 
     const checkUpdates = async () => {
       if (isSavingRef.current) return;
@@ -1082,6 +1254,7 @@ export default function App() {
         onRemoveItem={handleRemoveItem}
         onClearCart={handleClearCart}
         config={config}
+        onOrderPlaced={handleCreateOrder}
       />
 
       {/* Product Detail Modal */}
@@ -1110,6 +1283,10 @@ export default function App() {
         syncLogs={syncLogs}
         onClearSyncLogs={handleClearSyncLogs}
         catalogVersion={localCatalogVersionRef.current}
+        orders={orders}
+        onUpdateOrderStatus={handleUpdateOrderStatus}
+        onDeleteOrder={handleDeleteOrder}
+        onDeleteCancelledOrders={handleDeleteCancelledOrders}
       />
 
       {/* Real-time Multi-device Sync Toast Notification */}

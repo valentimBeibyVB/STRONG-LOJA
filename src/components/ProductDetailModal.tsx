@@ -169,11 +169,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2.5">
-                  {product.colors.map((color) => {
-                    const isSelected = selectedColor.name === color.name;
+                  {product.colors.map((color, colorIdx) => {
+                    const isSelected =
+                      selectedColor === color ||
+                      (selectedColor.name === color.name &&
+                        selectedColor.image === color.image &&
+                        selectedColor.hex === color.hex);
                     return (
                       <button
-                        key={color.name}
+                        key={`${color.name}-${colorIdx}`}
                         type="button"
                         onClick={() => setSelectedColor(color)}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
@@ -209,11 +213,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((size) => {
+                  {product.sizes.map((size, sizeIdx) => {
                     const isSelected = selectedSize === size;
                     return (
                       <button
-                        key={size}
+                        key={`${size}-${sizeIdx}`}
                         type="button"
                         onClick={() => setSelectedSize(size)}
                         className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition ${

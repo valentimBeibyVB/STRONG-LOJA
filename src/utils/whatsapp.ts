@@ -16,9 +16,10 @@ export function generateWhatsAppOrderText(
   items: CartItem[],
   totalAmount: number,
   config: StoreConfig,
-  customer?: CheckoutCustomerInfo
+  customer?: CheckoutCustomerInfo,
+  orderReference?: string
 ): string {
-  const orderId = `STR-${Math.floor(1000 + Math.random() * 9000)}`;
+  const orderId = orderReference || `STR-${Math.floor(1000 + Math.random() * 9000)}`;
 
   let text = `🔥 *NOVA ENCOMENDA STRONG — #${orderId}*\n\n`;
   if (
@@ -86,10 +87,11 @@ export function generateWhatsAppOrderUrl(
   items: CartItem[],
   totalAmount: number,
   config: StoreConfig,
-  customer?: CheckoutCustomerInfo
+  customer?: CheckoutCustomerInfo,
+  orderReference?: string
 ): string {
   const cleanedPhone = config.whatsappNumber.replace(/\D/g, '');
-  const text = generateWhatsAppOrderText(items, totalAmount, config, customer);
+  const text = generateWhatsAppOrderText(items, totalAmount, config, customer, orderReference);
   const encodedMessage = encodeURIComponent(text);
   return `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodedMessage}`;
 }

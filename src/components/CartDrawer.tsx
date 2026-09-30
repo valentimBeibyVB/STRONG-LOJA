@@ -15,7 +15,7 @@ import {
   Info,
   AlertCircle,
 } from 'lucide-react';
-import { CartItem, CheckoutCustomerInfo, StoreConfig } from '../types';
+import { CartItem, CheckoutCustomerInfo, StoreConfig, Order } from '../types';
 import {
   formatPrice,
   generateWhatsAppOrderUrl,
@@ -30,6 +30,7 @@ interface CartDrawerProps {
   onRemoveItem: (itemId: string) => void;
   onClearCart: () => void;
   config: StoreConfig;
+  onOrderPlaced?: (order: Order) => void;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -40,6 +41,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onRemoveItem,
   onClearCart,
   config,
+  onOrderPlaced,
 }) => {
   const [customerInfo, setCustomerInfo] = useState<CheckoutCustomerInfo>({
     name: '',
@@ -109,7 +111,49 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   };
 
   const executeWhatsAppCheckout = () => {
-    const url = generateWhatsAppOrderUrl(items, totalAmount, config, customerInfo);
+    const now = Date.now();
+    const reference = `STR-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newOrder: Order = {
+      id: `ord_${now}_${Math.random().toString(36).substring(2, 7)}`,
+      reference,
+      timestamp: now,
+      createdAtFormatted: new Date(now).toLocaleString('pt-PT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      customer: { ...customerInfo },
+      items: items.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        name: i.name,
+        category: i.category,
+        price: i.price,
+        image: i.image,
+        colorName: i.selectedColor.name,
+        colorHex: i.selectedColor.hex,
+        size: i.selectedSize,
+        quantity: i.quantity,
+      })),
+      totalAmount,
+      totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+      status: 'nao_pago',
+      paymentMethod: customerInfo.paymentMethod,
+      notes: customerInfo.notes,
+    };
+
+    if (onOrderPlaced) {
+      try {
+        onOrderPlaced(newOrder);
+      } catch (e) {
+        console.warn('Erro ao registar encomenda:', e);
+      }
+    }
+
+    const url = generateWhatsAppOrderUrl(items, totalAmount, config, customerInfo, reference);
     setShowPhoneConfirmModal(false);
     openWhatsAppUrl(url);
   };
