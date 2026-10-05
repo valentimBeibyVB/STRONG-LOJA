@@ -390,9 +390,147 @@ export const OrdersManager: React.FC<OrdersManagerProps> = ({
           </p>
         </div>
       ) : (
-        <div className="border border-neutral-800 rounded-xl overflow-hidden bg-neutral-900 shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+        <div className="space-y-4">
+          {/* Mobile View: Responsive Order Cards */}
+          <div className="md:hidden space-y-3">
+            {filteredOrders.map((order) => {
+              const isPaid = order.status === 'pago';
+              const isCancelled = order.status === 'cancelado';
+              const isUnpaid = order.status === 'nao_pago';
+
+              return (
+                <div
+                  key={order.id}
+                  className={`p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3 shadow-md ${
+                    isCancelled ? 'opacity-70 bg-red-950/10' : ''
+                  }`}
+                >
+                  {/* Top: Reference, Date & Status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-black text-amber-400 text-sm">
+                          #{order.reference}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-neutral-400 block mt-0.5">
+                        {order.createdAtFormatted ||
+                          new Date(order.timestamp).toLocaleString('pt-PT', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                      </span>
+                    </div>
+
+                    {/* Status Changer Dropdown */}
+                    <div className="relative">
+                      <select
+                        value={order.status}
+                        onChange={(e) =>
+                          handleStatusSelect(order.id, e.target.value as OrderStatus)
+                        }
+                        className={`text-xs font-bold py-1 px-2.5 rounded-lg border focus:outline-none cursor-pointer ${
+                          isPaid
+                            ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/50'
+                            : isCancelled
+                            ? 'bg-red-950/80 text-red-400 border-red-500/50'
+                            : 'bg-amber-950/80 text-amber-400 border-amber-500/50'
+                        }`}
+                      >
+                        <option value="nao_pago">Não Pago</option>
+                        <option value="pago">Pago</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Customer Information */}
+                  <div className="p-2.5 rounded-lg bg-neutral-950/80 border border-neutral-800/80 space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white">
+                        {order.customer.name || 'Cliente Sem Nome'}
+                      </span>
+                      <span className="font-black text-amber-400 text-sm">
+                        {formatPrice(order.totalAmount, config)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-neutral-400">
+                      <Phone className="w-3 h-3 text-neutral-500 shrink-0" />
+                      <span>{order.customer.phone || 'Sem contacto'}</span>
+                      {order.customer.city && (
+                        <>
+                          <span className="text-neutral-600">•</span>
+                          <span className="truncate">{order.customer.city}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-neutral-500 pt-0.5">
+                      Pagamento: <strong className="text-neutral-300">{order.paymentMethod}</strong>
+                      {order.customer.expressSenderPhone && (
+                        <span className="text-emerald-400 ml-1">
+                          (Envio: {order.customer.expressSenderPhone})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Items Preview */}
+                  <div className="text-xs text-neutral-300">
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-neutral-400 mb-1">
+                      <ShoppingBag className="w-3 h-3 text-amber-400" />
+                      <span>
+                        {order.totalQuantity || order.items.reduce((s, i) => s + i.quantity, 0)}{' '}
+                        {order.totalQuantity === 1 ? 'artigo' : 'artigos'}:
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 line-clamp-2">
+                      {order.items
+                        .map((i) => `${i.quantity}x ${i.name} (${i.colorName || 'Cor'}, Tam: ${i.size})`)
+                        .join(' • ')}
+                    </p>
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-neutral-800/80">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrderForView(order)}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Ver Detalhes</span>
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenWhatsAppCustomer(order)}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-800/60 text-xs font-bold transition flex items-center gap-1"
+                        title="Conversar no WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">WhatsApp</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setOrderToDelete(order)}
+                        className="p-1.5 rounded-lg bg-neutral-950 text-neutral-500 hover:text-red-400 border border-neutral-800 transition"
+                        title="Eliminar pedido"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop View: Full Spreadsheet Table */}
+          <div className="hidden md:block border border-neutral-800 rounded-xl overflow-hidden bg-neutral-900 shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-neutral-800 bg-neutral-950/90 text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Ref. / Data</th>
@@ -588,12 +726,13 @@ export const OrdersManager: React.FC<OrdersManagerProps> = ({
             </span>
           </div>
         </div>
+      </div>
       )}
 
       {/* MODAL: Detalhes Completos da Encomenda */}
       {selectedOrderForView && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[70] overflow-y-auto flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fadeIn py-4 sm:py-8">
+          <div className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] my-auto">
             {/* Modal Header */}
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-950">
               <div className="flex items-center gap-2">
@@ -825,8 +964,8 @@ export const OrdersManager: React.FC<OrdersManagerProps> = ({
 
       {/* CONFIRM MODAL: Eliminar Encomenda Individual */}
       {orderToDelete && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-sm bg-neutral-900 border border-red-500/40 rounded-2xl p-6 text-center space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-[80] overflow-y-auto flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fadeIn py-6">
+          <div className="w-full max-w-sm bg-neutral-900 border border-red-500/40 rounded-2xl p-5 sm:p-6 text-center space-y-4 shadow-2xl my-auto max-h-[92dvh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 mx-auto">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -870,8 +1009,8 @@ export const OrdersManager: React.FC<OrdersManagerProps> = ({
 
       {/* CONFIRM MODAL: Eliminar Todos os Cancelados em Massa */}
       {showBulkDeleteModal && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-sm bg-neutral-900 border border-red-500/40 rounded-2xl p-6 text-center space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-[80] overflow-y-auto flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fadeIn py-6">
+          <div className="w-full max-w-sm bg-neutral-900 border border-red-500/40 rounded-2xl p-5 sm:p-6 text-center space-y-4 shadow-2xl my-auto max-h-[92dvh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>

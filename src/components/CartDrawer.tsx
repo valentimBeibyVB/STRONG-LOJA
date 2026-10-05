@@ -179,10 +179,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
         <aside
           id="cart-drawer-panel"
-          className="w-screen max-w-md bg-neutral-900 border-l border-neutral-800 shadow-2xl flex flex-col"
+          className="w-screen max-w-full sm:max-w-md bg-neutral-900 border-l border-neutral-800 shadow-2xl flex flex-col h-[100dvh]"
         >
           {/* Header */}
           <div className="p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/80">
@@ -651,7 +651,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
           {/* Cart Footer Checkout Bar */}
           {items.length > 0 && (
-            <div className="p-5 border-t border-neutral-800 bg-neutral-950 space-y-3">
+            <div className="p-4 sm:p-5 border-t border-neutral-800 bg-neutral-950 space-y-3 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
               {/* Financial Totals */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between text-neutral-400">
@@ -715,8 +715,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
       {/* Modal / Dialog de Confirmação do Número Express */}
       {showPhoneConfirmModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-sm bg-neutral-900 border border-emerald-500/50 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 text-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn overflow-y-auto py-4 sm:py-6">
+          <div className="w-full max-w-sm bg-neutral-900 border border-emerald-500/50 rounded-2xl shadow-2xl overflow-y-auto max-h-[92dvh] p-5 sm:p-6 space-y-4 text-center my-auto">
             {/* Header Icon */}
             <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-md">
               <Smartphone className="w-7 h-7" />

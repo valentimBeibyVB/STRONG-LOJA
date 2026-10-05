@@ -42,26 +42,26 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Main Nav Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
           {/* Brand Logo */}
-          <div className="flex items-center gap-4">
-            <a href="#" className="group flex items-center gap-3 focus:outline-none" aria-label="Strong Brand Home">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <a href="#" className="group flex items-center gap-2.5 sm:gap-3 focus:outline-none" aria-label="Strong Brand Home">
               <BrandLogo
                 src={config.logoUrl}
                 alt={`${config.storeName} Logo`}
                 size="md"
                 shape="rounded"
-                className="p-1 border border-neutral-800 transform transition-all group-hover:scale-105 group-hover:border-amber-400/70 shadow-lg shadow-black/40 group-hover:shadow-amber-400/10"
+                className="p-1 border border-neutral-800 transform transition-all group-hover:scale-105 group-hover:border-amber-400/70 shadow-lg shadow-black/40 group-hover:shadow-amber-400/10 shrink-0"
               />
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black tracking-widest text-white font-['Cabinet_Grotesk',sans-serif]">
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-lg sm:text-2xl font-black tracking-wider sm:tracking-widest text-white font-['Cabinet_Grotesk',sans-serif] truncate">
                     {config.storeName}
                   </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-[0.25em] text-neutral-400 -mt-1">
+                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-[0.2em] sm:tracking-[0.25em] text-neutral-400 -mt-0.5 sm:-mt-1 truncate">
                   APPAREL & STREETWEAR
                 </span>
               </div>
@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* PWA Install Button */}
             <PWAInstallButton variant="header" />
 
@@ -100,15 +100,15 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="cart-drawer-toggle-btn"
               onClick={onOpenCart}
-              className="relative inline-flex items-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-sm rounded-lg shadow-lg shadow-amber-400/15 transition-all transform active:scale-95"
+              className="relative inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs sm:text-sm rounded-lg shadow-lg shadow-amber-400/15 transition-all transform active:scale-95"
               aria-label="Abrir Carrinho"
             >
-              <ShoppingBag className="w-5 h-5 stroke-[2.2]" />
+              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
               <span className="hidden sm:inline">Carrinho</span>
               {cartCount > 0 && (
                 <span
                   id="cart-item-badge"
-                  className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-black bg-neutral-950 text-amber-400 rounded-full animate-bounce"
+                  className="inline-flex items-center justify-center min-w-4.5 h-4.5 sm:min-w-5 sm:h-5 px-1 sm:px-1.5 text-[10px] sm:text-xs font-black bg-neutral-950 text-amber-400 rounded-full animate-bounce"
                 >
                   {cartCount}
                 </span>
@@ -118,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Category Pill Tabs */}
-        <div className="flex items-center gap-2 py-3 border-t border-neutral-800/80 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 py-2.5 sm:py-3 border-t border-neutral-800/80 overflow-x-auto no-scrollbar touch-pan-x pr-4">
           <button
             id="cat-tab-todos"
             onClick={() => onSelectCategory('todos')}

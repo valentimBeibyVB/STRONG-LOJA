@@ -53,11 +53,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           id="pwa-install-floating-btn"
           type="button"
           onClick={() => setShowModal(true)}
-          className={`fixed bottom-22 right-6 z-40 p-3 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-neutral-950 font-bold shadow-xl shadow-amber-400/20 flex items-center justify-center transform hover:scale-110 active:scale-95 transition-all group ${className}`}
+          className={`fixed bottom-6 left-4 sm:left-6 z-40 p-3 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-neutral-950 font-bold shadow-xl shadow-amber-400/25 flex items-center justify-center transform hover:scale-105 active:scale-95 transition-all group border border-amber-300/40 ${className}`}
           title="Instalar App no Telemóvel"
           aria-label="Instalar App no Telemóvel"
         >
-          <Smartphone className="w-5 h-5" />
+          <Smartphone className="w-5 h-5 text-neutral-950" />
           <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-xs transition-all duration-300 ease-in-out text-xs font-black pl-0 group-hover:pl-2">
             Instalar App
           </span>

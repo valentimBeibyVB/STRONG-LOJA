@@ -69,46 +69,45 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-start sm:items-center justify-center p-3 sm:p-6 py-4 sm:py-8">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/85 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal Dialog */}
       <div
         id="product-detail-modal"
-        className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden z-10 my-8"
+        className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden z-10 my-auto flex flex-col md:grid md:grid-cols-2 max-h-[92dvh] sm:max-h-[88dvh]"
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 p-2 text-neutral-400 hover:text-white bg-neutral-950/60 hover:bg-neutral-800 rounded-full transition"
+          className="absolute top-3 right-3 z-30 p-2 text-neutral-300 hover:text-white bg-neutral-950/80 hover:bg-neutral-800 rounded-full border border-neutral-800/80 shadow-md transition"
           aria-label="Fechar modal"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          {/* Left Column: Image */}
-          <div className="relative bg-neutral-950 aspect-square md:aspect-auto flex items-center justify-center overflow-hidden">
-            <img
-              src={activeImage}
-              alt={`${product.name} - ${selectedColor.name}`}
-              className="w-full h-full object-cover object-center max-h-[500px]"
-            />
-            {product.badge && (
-              <div className="absolute top-4 left-4 z-10">
-                <span className="px-3 py-1 text-xs font-black uppercase tracking-wider rounded bg-amber-400 text-neutral-950">
-                  {product.badge}
-                </span>
-              </div>
-            )}
-          </div>
+        {/* Left Column: Image */}
+        <div className="relative bg-neutral-950 flex items-center justify-center overflow-hidden shrink-0 h-56 sm:h-72 md:h-full md:aspect-auto max-h-[280px] md:max-h-none">
+          <img
+            src={activeImage}
+            alt={`${product.name} - ${selectedColor.name}`}
+            className="w-full h-full object-cover object-center"
+          />
+          {product.badge && (
+            <div className="absolute top-3.5 left-3.5 z-10">
+              <span className="px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded bg-amber-400 text-neutral-950 shadow-md">
+                {product.badge}
+              </span>
+            </div>
+          )}
+        </div>
 
-          {/* Right Column: Details & Customizer */}
-          <div className="p-6 sm:p-8 flex flex-col justify-between space-y-6">
+        {/* Right Column: Details & Customizer */}
+        <div className="p-4 sm:p-6 md:p-7 flex flex-col justify-between space-y-5 overflow-y-auto flex-1">
             <div>
               {/* Category & Title */}
               <div className="flex items-center gap-2">
@@ -293,7 +292,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };
