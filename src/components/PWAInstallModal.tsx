@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Smartphone,
@@ -33,6 +33,23 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [downloadApkSuccess, setDownloadApkSuccess] = useState(false);
+
+  // Sync activeTab when modal opens based on user agent
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(isIOS ? 'ios' : 'android');
+    }
+  }, [isOpen, isIOS]);
+
+  // Handle escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -73,8 +90,14 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn py-4 sm:py-8">
+      {/* Backdrop click to dismiss */}
       <div
-        className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] my-auto"
+        className="fixed inset-0 bg-black/75 transition-opacity"
+        onClick={onClose}
+      />
+
+      <div
+        className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] my-auto z-10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Banner */}

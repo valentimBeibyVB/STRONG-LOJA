@@ -8,6 +8,7 @@ interface HeaderProps {
   cartCount: number;
   onOpenCart: () => void;
   onOpenAdmin?: () => void;
+  onOpenInstall?: () => void;
   selectedCategory: ProductCategory;
   onSelectCategory: (category: ProductCategory) => void;
   searchQuery: string;
@@ -18,6 +19,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   cartCount,
   onOpenCart,
+  onOpenInstall,
   selectedCategory,
   onSelectCategory,
   searchQuery,
@@ -93,8 +95,8 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            {/* PWA Install Button */}
-            <PWAInstallButton variant="header" />
+            {/* PWA Install Button ("Baixar App") */}
+            <PWAInstallButton variant="header" onClick={onOpenInstall} />
 
             {/* Shopping Cart Button */}
             <button

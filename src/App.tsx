@@ -15,8 +15,12 @@ import { CartDrawer } from './components/CartDrawer';
 import { AdminModal } from './components/AdminModal';
 import { Footer } from './components/Footer';
 import { PWAInstallButton } from './components/PWAInstallButton';
+import { PWAInstallModal } from './components/PWAInstallModal';
 
 export default function App() {
+  // 0. PWA Install Modal Unified State
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+
   // 1. Storage & Persistence (Client-side localStorage suitable for GitHub Pages / static hosting)
   const [products, setProducts] = useState<Product[]>(() => {
     try {
@@ -1108,6 +1112,7 @@ export default function App() {
         cartCount={totalCartCount}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenInstall={() => setIsInstallModalOpen(true)}
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
         searchQuery={searchQuery}
@@ -1235,7 +1240,10 @@ export default function App() {
       </a>
 
       {/* Floating PWA Install App Trigger Button for Mobile Visitors */}
-      <PWAInstallButton variant="floating" />
+      <PWAInstallButton
+        variant="floating"
+        onClick={() => setIsInstallModalOpen(true)}
+      />
 
       {/* Floating Scroll-to-Top Button */}
       {showScrollTop && (
@@ -1268,6 +1276,13 @@ export default function App() {
         isOpen={!!detailProduct}
         onClose={() => setDetailProduct(null)}
         onAddToCart={(prod, col, sz, qty) => handleAddToCart(prod, col, sz, qty)}
+      />
+
+      {/* PWA Install Modal (Unified for header 'Baixar App', floating 'Instalar App' and footer) */}
+      <PWAInstallModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        storeName={config.storeName}
       />
 
       {/* Admin Panel Modal (Upload real images, add new products, change WhatsApp) */}
@@ -1308,6 +1323,7 @@ export default function App() {
       <Footer
         config={config}
         onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenInstall={() => setIsInstallModalOpen(true)}
       />
     </div>
   );

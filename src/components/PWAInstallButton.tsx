@@ -6,13 +6,15 @@ import { PWAInstallModal } from './PWAInstallModal';
 interface PWAInstallButtonProps {
   className?: string;
   variant?: 'header' | 'floating' | 'banner' | 'footer';
+  onClick?: () => void;
 }
 
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   className = '',
   variant = 'header',
+  onClick,
 }) => {
-  const { isInstalled, isInstallable, isIOS } = usePWAInstall();
+  const { isInstalled, isIOS } = usePWAInstall();
   const [showModal, setShowModal] = useState(false);
 
   // If already running in standalone mode (installed app), suppress button
@@ -20,13 +22,21 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     return null;
   }
 
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    } else {
+      setShowModal(true);
+    }
+  };
+
   if (variant === 'header') {
     return (
       <>
         <button
           id="pwa-install-header-btn"
           type="button"
-          onClick={() => setShowModal(true)}
+          onClick={handleClick}
           className={`relative inline-flex items-center gap-1.5 px-3 py-2 bg-neutral-900/90 hover:bg-neutral-800 text-neutral-200 hover:text-white border border-neutral-700/80 hover:border-amber-400/50 rounded-lg text-xs font-bold transition shadow-sm active:scale-95 group ${className}`}
           title="Instalar App no iPhone ou Android"
           aria-label="Instalar App no iPhone ou Android"
@@ -38,10 +48,12 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           </span>
         </button>
 
-        <PWAInstallModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-        />
+        {!onClick && (
+          <PWAInstallModal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+          />
+        )}
       </>
     );
   }
@@ -52,7 +64,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         <button
           id="pwa-install-floating-btn"
           type="button"
-          onClick={() => setShowModal(true)}
+          onClick={handleClick}
           className={`fixed bottom-6 left-4 sm:left-6 z-40 p-3 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-neutral-950 font-bold shadow-xl shadow-amber-400/25 flex items-center justify-center transform hover:scale-105 active:scale-95 transition-all group border border-amber-300/40 ${className}`}
           title="Instalar App no Telemóvel"
           aria-label="Instalar App no Telemóvel"
@@ -63,10 +75,12 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           </span>
         </button>
 
-        <PWAInstallModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-        />
+        {!onClick && (
+          <PWAInstallModal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+          />
+        )}
       </>
     );
   }
@@ -75,17 +89,19 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     <>
       <button
         type="button"
-        onClick={() => setShowModal(true)}
+        onClick={handleClick}
         className={className}
       >
         <Smartphone className="w-4 h-4 text-amber-400" />
         <span>Instalar App no Telemóvel</span>
       </button>
 
-      <PWAInstallModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-      />
+      {!onClick && (
+        <PWAInstallModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </>
   );
 };

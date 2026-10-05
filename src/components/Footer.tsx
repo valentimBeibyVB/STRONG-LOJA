@@ -7,9 +7,10 @@ import { PWAInstallButton } from './PWAInstallButton';
 interface FooterProps {
   config: StoreConfig;
   onOpenAdmin: () => void;
+  onOpenInstall?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ config, onOpenAdmin }) => {
+export const Footer: React.FC<FooterProps> = ({ config, onOpenAdmin, onOpenInstall }) => {
   return (
     <footer id="main-footer" className="bg-neutral-950 border-t border-neutral-800 text-neutral-400 text-xs mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -62,6 +63,7 @@ export const Footer: React.FC<FooterProps> = ({ config, onOpenAdmin }) => {
               {/* Install PWA Button */}
               <PWAInstallButton
                 variant="banner"
+                onClick={onOpenInstall}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-400 hover:text-amber-300 border border-neutral-800 hover:border-amber-400/40 text-xs font-bold transition"
               />
             </div>
