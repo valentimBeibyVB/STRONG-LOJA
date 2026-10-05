@@ -31,10 +31,10 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           title="Instalar App no iPhone ou Android"
           aria-label="Instalar App no iPhone ou Android"
         >
-          <Smartphone className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-          <span className="hidden md:inline">Baixar App</span>
-          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-400/20 text-amber-300 font-extrabold uppercase border border-amber-400/30">
-            {isIOS ? 'iPhone' : 'App'}
+          <Smartphone className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
+          <span className="inline text-xs font-bold">Baixar App</span>
+          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-400/20 text-amber-300 font-extrabold uppercase border border-amber-400/30 shrink-0">
+            {isIOS ? 'iOS' : 'APK'}
           </span>
         </button>
 

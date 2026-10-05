@@ -594,6 +594,17 @@ async function startServer() {
     return res.status(404).send("Comprovativo não encontrado.");
   });
 
+  // 3. Servir ficheiro APK oficial da aplicação Android
+  app.get(["/strong-app.apk", "/api/download-apk"], (req, res) => {
+    const apkPath = path.join(process.cwd(), "public", "strong-app.apk");
+    if (fs.existsSync(apkPath)) {
+      res.setHeader("Content-Type", "application/vnd.android.package-archive");
+      res.setHeader("Content-Disposition", 'attachment; filename="strong-app.apk"');
+      return res.sendFile(apkPath);
+    }
+    return res.status(404).send("APK não encontrado.");
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

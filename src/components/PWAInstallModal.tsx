@@ -32,6 +32,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
   const [activeTab, setActiveTab] = useState<'ios' | 'android'>(isIOS ? 'ios' : 'android');
   const [copiedLink, setCopiedLink] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [downloadApkSuccess, setDownloadApkSuccess] = useState(false);
 
   if (!isOpen) return null;
 
@@ -44,13 +45,30 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
     });
   };
 
+  const handleDownloadAPK = () => {
+    const link = document.createElement('a');
+    link.href = './strong-app.apk';
+    link.download = 'strong-app.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setDownloadApkSuccess(true);
+    setTimeout(() => setDownloadApkSuccess(false), 5000);
+  };
+
   const handleDirectInstall = async () => {
     setIsInstalling(true);
-    const success = await install();
-    setIsInstalling(false);
-    if (success) {
-      onClose();
+    if (isInstallable) {
+      const success = await install();
+      setIsInstalling(false);
+      if (success) {
+        onClose();
+        return;
+      }
     }
+    // If native prompt is not active, trigger the APK download
+    setIsInstalling(false);
+    handleDownloadAPK();
   };
 
   return (
@@ -136,27 +154,51 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
           {/* ANDROID INSTRUCTIONS */}
           {activeTab === 'android' && (
             <div className="space-y-4">
-              {/* Direct 1-Click Install Button if supported by current browser session */}
-              {isInstallable ? (
-                <div className="p-4 rounded-xl bg-gradient-to-r from-amber-400/20 via-neutral-900 to-neutral-900 border border-amber-400/50">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-400" /> Instalação Automática Disponível
-                    </span>
-                  </div>
-                  <p className="text-xs text-neutral-300 mb-3">
-                    O seu navegador Android detectou a loja como um aplicativo pronto para instalar.
-                  </p>
+              {/* Direct 1-Click Install Button & Direct APK Download Box */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-amber-400/20 via-neutral-900 to-neutral-900 border border-amber-400/50 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Instalação do Aplicativo Android</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-950 text-emerald-400 border border-emerald-500/40">
+                    APK & PWA
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  Acede à loja oficial da <strong className="text-white">{storeName}</strong> em ecrã inteiro no teu smartphone Android com acesso instantâneo.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {/* Primary 1-Click Install Button */}
                   <button
+                    type="button"
                     onClick={handleDirectInstall}
                     disabled={isInstalling}
-                    className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition transform active:scale-98 disabled:opacity-50"
+                    className="w-full py-3 px-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition transform active:scale-98 disabled:opacity-50"
                   >
-                    <Download className="w-5 h-5 stroke-[2.5]" />
-                    {isInstalling ? 'Instalando...' : 'Instalar App no Android Agora'}
+                    <Smartphone className="w-4 h-4 stroke-[2.5]" />
+                    <span>{isInstalling ? 'A Instalar...' : 'Instalar App no Android'}</span>
+                  </button>
+
+                  {/* Direct APK Download Button */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadAPK}
+                    className="w-full py-3 px-3.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700 hover:border-amber-400/60 shadow-md transition transform active:scale-98"
+                  >
+                    <Download className="w-4 h-4 text-amber-400 stroke-[2.5]" />
+                    <span>{downloadApkSuccess ? 'Download Iniciado!' : 'Descarregar APK (.apk)'}</span>
                   </button>
                 </div>
-              ) : null}
+
+                {downloadApkSuccess && (
+                  <p className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-medium pt-1">
+                    <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                    <span>Download de <strong>strong-app.apk</strong> iniciado! Abre o ficheiro para instalar.</span>
+                  </p>
+                )}
+              </div>
 
               {/* Step-by-Step Android Guide */}
               <div className="space-y-3">
